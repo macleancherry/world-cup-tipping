@@ -92,7 +92,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats row */}
-      <div className="grid-4 mb-4">
+      <div className="grid-4 stats-strip mb-4">
         <div className="stat-card">
           <div className="stat-label">Total Staked</div>
           <div className="stat-value text-red">{formatCents(kitty.total_staked)}</div>
@@ -116,9 +116,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid-2">
+      <div className="grid-2 dashboard-today-grid">
         {/* Today's match day */}
-        <div className="card">
+        <div className="card dashboard-matchday-card">
           <div className="card-header">
             <span className="card-title">Today's Match Day</span>
             {today && <Link to={`/match-days/${today.id}`} className="btn btn-sm btn-primary">+ Add Bet</Link>}
@@ -153,7 +153,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Today's fixtures */}
-        <div className="card">
+        <div className="card dashboard-fixtures-card">
           <div className="card-header">
             <span className="card-title">Today's Fixtures</span>
             <span className="badge badge-scheduled">{today_fixtures.length}</span>

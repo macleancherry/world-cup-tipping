@@ -137,8 +137,9 @@ export default function MatchDayDetailPage() {
         </div>
       )}
 
+      <div className="matchday-layout">
       {/* Day summary */}
-      <div className="grid-3 mb-4">
+      <div className="grid-3 mb-4 matchday-stats">
         <div className="stat-card">
           <div className="stat-label">Budget</div>
           <div className="stat-value">{formatCents(day.budget_amount)}</div>
@@ -157,7 +158,7 @@ export default function MatchDayDetailPage() {
       </div>
 
       {/* Fixtures */}
-      <div className="section">
+      <div className="section matchday-fixtures">
         <div className="section-title">Fixtures ({day.fixtures.length})</div>
         {day.fixtures.length === 0 ? (
           <div className="empty-state"><p>No fixtures on this day</p></div>
@@ -168,7 +169,7 @@ export default function MatchDayDetailPage() {
 
       {/* Pending bets */}
       {pendingBets.length > 0 && (
-        <div className="section">
+        <div className="section matchday-bets">
           <div className="section-title">Pending Bets ({pendingBets.length})</div>
           {pendingBets.map(bet => (
             <BetCard
@@ -183,7 +184,7 @@ export default function MatchDayDetailPage() {
 
       {/* Settled bets */}
       {settledBets.length > 0 && (
-        <div className="section">
+        <div className="section matchday-bets">
           <div className="section-title">Settled Bets ({settledBets.length})</div>
           {settledBets.map(bet => (
             <BetCard key={bet.id} bet={bet} onReopen={reopenBet} />
@@ -198,6 +199,7 @@ export default function MatchDayDetailPage() {
           <button className="btn btn-primary mt-3" onClick={() => setShowBetForm(true)}>+ Add Bet</button>
         </div>
       )}
+      </div>
 
       {showBetForm && (
         <BetForm
