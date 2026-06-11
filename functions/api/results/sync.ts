@@ -10,41 +10,49 @@ interface ProviderFixture {
   winner: string;
 }
 
-async function fetchFromProvider(env: Env): Promise<ProviderFixture[]> {
-  if (env.RESULTS_PROVIDER === 'manual' || !env.RESULTS_API_KEY) return [];
+async function fetchFromProvider(env: Env): Promise<{ fixtures: ProviderFixture[]; debug: string }> {
+  if (env.RESULTS_PROVIDER === 'manual' || !env.RESULTS_API_KEY) {
+    return { fixtures: [], debug: 'provider=manual or no API key' };
+  }
 
-  const res = await fetch(`https://v3.football.api-sports.io/fixtures?league=1&season=2026`, {
+  const url = `https://v3.football.api-sports.io/fixtures?league=1&season=2026`;
+  const res = await fetch(url, {
     headers: { 'x-apisports-key': env.RESULTS_API_KEY },
   });
-  if (!res.ok) throw new Error(`Provider API error: ${res.status}`);
-  const data = await res.json() as { response: Array<{
+  if (!res.ok) throw new Error(`API returned HTTP ${res.status}`);
+  const data = await res.json() as { results: number; errors: unknown; response: Array<{
     fixture: { id: number; date: string; status: { short: string } };
     goals: { home: number | null; away: number | null };
     teams: { home: { winner: boolean | null }; away: { winner: boolean | null } };
   }> };
 
-  return data.response.map(f => {
-    const statusMap: Record<string, string> = {
-      FT: 'finished', AET: 'finished', PEN: 'finished',
-      '1H': 'in_progress', HT: 'in_progress', '2H': 'in_progress', ET: 'in_progress',
-      PST: 'postponed', CANC: 'cancelled',
-    };
-    const s = statusMap[f.fixture.status.short] ?? 'scheduled';
-    let winner = 'unknown';
-    if (s === 'finished') {
-      if (f.teams.home.winner === true) winner = 'home';
-      else if (f.teams.away.winner === true) winner = 'away';
-      else winner = 'draw';
-    }
-    return {
-      externalProviderId: String(f.fixture.id),
-      kickoffUtc: new Date(f.fixture.date).toISOString(),
-      status: s,
-      homeScore: f.goals.home,
-      awayScore: f.goals.away,
-      winner,
-    };
-  });
+  const debug = `HTTP ${res.status} · results=${data.results} · errors=${JSON.stringify(data.errors)}`;
+
+  return {
+    debug,
+    fixtures: data.response.map(f => {
+      const statusMap: Record<string, string> = {
+        FT: 'finished', AET: 'finished', PEN: 'finished',
+        '1H': 'in_progress', HT: 'in_progress', '2H': 'in_progress', ET: 'in_progress',
+        PST: 'postponed', CANC: 'cancelled',
+      };
+      const s = statusMap[f.fixture.status.short] ?? 'scheduled';
+      let winner = 'unknown';
+      if (s === 'finished') {
+        if (f.teams.home.winner === true) winner = 'home';
+        else if (f.teams.away.winner === true) winner = 'away';
+        else winner = 'draw';
+      }
+      return {
+        externalProviderId: String(f.fixture.id),
+        kickoffUtc: new Date(f.fixture.date).toISOString(),
+        status: s,
+        homeScore: f.goals.home,
+        awayScore: f.goals.away,
+        winner,
+      };
+    }),
+  };
 }
 
 function canAutoSettle(bet: Record<string, unknown>, fixture: Record<string, unknown>): { canSettle: boolean; result: string } {
@@ -80,8 +88,11 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   const errors: string[] = [];
 
   let providerFixtures: ProviderFixture[] = [];
+  let providerDebug = '';
   try {
-    providerFixtures = await fetchFromProvider(ctx.env);
+    const result = await fetchFromProvider(ctx.env);
+    providerFixtures = result.fixtures;
+    providerDebug = result.debug;
   } catch (e) {
     errors.push(`Provider error: ${(e as Error).message}`);
   }
@@ -147,6 +158,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     bets_auto_settled: betsAutoSettled,
     bets_needing_settlement: betsNeedingSettlement,
     provider: ctx.env.RESULTS_PROVIDER ?? 'not set',
+    api_debug: providerDebug,
     errors,
   });
 };
