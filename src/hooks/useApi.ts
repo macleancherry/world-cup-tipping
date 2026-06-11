@@ -45,7 +45,6 @@ export function formatDate(dateStr: string): string {
 
 export function formatKickoff(utcStr: string): string {
   return new Date(utcStr).toLocaleTimeString('en-AU', {
-    timeZone: 'Australia/Perth',
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
