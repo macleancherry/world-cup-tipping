@@ -57,7 +57,7 @@ export default function BetsPage() {
 
       {/* Summary */}
       {filter === 'all' && bets.length > 0 && (
-        <div className="grid-4 mb-4">
+        <div className="grid-4 stats-strip mb-4">
           <div className="stat-card">
             <div className="stat-label">Total bets</div>
             <div className="stat-value">{bets.length}</div>
