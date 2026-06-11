@@ -26,7 +26,13 @@ async function fetchFromProvider(env: Env): Promise<{ fixtures: ProviderFixture[
     teams: { home: { winner: boolean | null }; away: { winner: boolean | null } };
   }> };
 
-  const debug = `HTTP ${res.status} · results=${data.results} · errors=${JSON.stringify(data.errors)}`;
+  // API-Football returns errors in the body with HTTP 200 — check for them explicitly
+  if (data.errors && typeof data.errors === 'object' && Object.keys(data.errors).length > 0) {
+    const msg = Object.values(data.errors as Record<string, string>).join('; ');
+    throw new Error(msg);
+  }
+
+  const debug = `HTTP ${res.status} · results=${data.results}`;
 
   return {
     debug,
