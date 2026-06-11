@@ -94,7 +94,8 @@ export default function MatchDayDetailPage() {
             <h1 className="page-title">{formatDate(day.local_date)}</h1>
             {day.stage && <p className="page-subtitle">{day.stage}</p>}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center" style={{ flexWrap: 'wrap' }}>
+            <span className="deadline-chip">📋 Submit by 9pm AEST</span>
             <button className="btn btn-ghost btn-sm" onClick={() => setEditingDay(!editingDay)}>
               {editingDay ? 'Cancel' : '✏️ Edit Day'}
             </button>
