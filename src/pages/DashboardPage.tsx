@@ -30,8 +30,6 @@ interface DashboardData {
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [syncLoading, setSyncLoading] = useState(false)
-  const [syncResult, setSyncResult] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/dashboard')
@@ -39,22 +37,6 @@ export default function DashboardPage() {
       .then(d => { setData(d as DashboardData); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
-
-  async function checkResults() {
-    setSyncLoading(true)
-    setSyncResult(null)
-    try {
-      const r = await fetch('/api/results/sync', { method: 'POST' })
-      const d = await r.json() as { fixtures_updated: number; bets_auto_settled: number; bets_needing_settlement: number; errors: string[] }
-      setSyncResult(`Updated ${d.fixtures_updated} fixtures. Auto-settled ${d.bets_auto_settled} bets. ${d.bets_needing_settlement} need manual settlement.`)
-      // Refresh dashboard
-      fetch('/api/dashboard').then(r => r.json()).then(d => setData(d as DashboardData))
-    } catch {
-      setSyncResult('Sync failed. Check your connection.')
-    } finally {
-      setSyncLoading(false)
-    }
-  }
 
   if (loading) return <div className="loading-screen"><div className="spinner" /></div>
   if (!data) return <div className="alert alert-error">Failed to load dashboard</div>
@@ -69,17 +51,13 @@ export default function DashboardPage() {
           <h1 className="page-title">⚽ World Cup 2026</h1>
           <p className="page-subtitle">Betting Kitty Dashboard</p>
         </div>
-        <div className="flex gap-2">
-          <button className="btn btn-primary" onClick={checkResults} disabled={syncLoading}>
-            {syncLoading ? '⟳ Checking...' : '🔄 Check Results'}
-          </button>
-          <Link to="/match-days" className="btn btn-ghost">+ Add Bet</Link>
-        </div>
+        <Link
+          to={today ? `/match-days/${today.id}` : '/match-days'}
+          className="btn btn-primary btn-lg"
+        >
+          + Add Bet
+        </Link>
       </div>
-
-      {syncResult && (
-        <div className="alert alert-info" style={{ marginBottom: '1.5rem' }}>{syncResult}</div>
-      )}
 
       {/* Kitty hero */}
       <div className="kitty-hero">
@@ -156,6 +134,15 @@ export default function DashboardPage() {
                 <span>{formatCents(Math.max(0, today.today_budget - today.today_staked))} remaining</span>
                 {today.assigned_participant_name && <span>Bettor: {today.assigned_participant_name}</span>}
               </div>
+              {upcoming_fixtures.length > 0 && (
+                <Link
+                  to={`/match-days/${today.id}`}
+                  className="btn btn-primary btn-block"
+                  style={{ marginTop: '0.75rem' }}
+                >
+                  + Add a Bet on Tonight's Games
+                </Link>
+              )}
             </div>
           )}
         </div>
