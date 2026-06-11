@@ -15,49 +15,46 @@ async function fetchFromProvider(env: Env): Promise<{ fixtures: ProviderFixture[
     return { fixtures: [], debug: 'provider=manual or no API key' };
   }
 
-  const url = `https://v3.football.api-sports.io/fixtures?league=1&season=2026`;
+  // football-data.org — free tier, covers WC 2026
+  const url = `https://api.football-data.org/v4/competitions/WC/matches`;
   const res = await fetch(url, {
-    headers: { 'x-apisports-key': env.RESULTS_API_KEY },
+    headers: { 'X-Auth-Token': env.RESULTS_API_KEY },
   });
   if (!res.ok) throw new Error(`API returned HTTP ${res.status}`);
-  const data = await res.json() as { results: number; errors: unknown; response: Array<{
-    fixture: { id: number; date: string; status: { short: string } };
-    goals: { home: number | null; away: number | null };
-    teams: { home: { winner: boolean | null }; away: { winner: boolean | null } };
-  }> };
 
-  // API-Football returns errors in the body with HTTP 200 — check for them explicitly
-  if (data.errors && typeof data.errors === 'object' && Object.keys(data.errors).length > 0) {
-    const msg = Object.values(data.errors as Record<string, string>).join('; ');
-    throw new Error(msg);
-  }
+  const data = await res.json() as {
+    matches: Array<{
+      id: number;
+      utcDate: string;
+      status: string;
+      score: {
+        winner: string | null;
+        fullTime: { home: number | null; away: number | null };
+      };
+    }>;
+  };
 
-  const debug = `HTTP ${res.status} · results=${data.results}`;
+  const debug = `HTTP ${res.status} · matches=${data.matches?.length ?? 0}`;
+
+  const statusMap: Record<string, string> = {
+    FINISHED: 'finished',
+    IN_PLAY: 'in_progress', LIVE: 'in_progress', PAUSED: 'in_progress',
+    POSTPONED: 'postponed', CANCELLED: 'cancelled', SUSPENDED: 'cancelled',
+  };
 
   return {
     debug,
-    fixtures: data.response.map(f => {
-      const statusMap: Record<string, string> = {
-        FT: 'finished', AET: 'finished', PEN: 'finished',
-        '1H': 'in_progress', HT: 'in_progress', '2H': 'in_progress', ET: 'in_progress',
-        PST: 'postponed', CANC: 'cancelled',
-      };
-      const s = statusMap[f.fixture.status.short] ?? 'scheduled';
-      let winner = 'unknown';
-      if (s === 'finished') {
-        if (f.teams.home.winner === true) winner = 'home';
-        else if (f.teams.away.winner === true) winner = 'away';
-        else winner = 'draw';
-      }
-      return {
-        externalProviderId: String(f.fixture.id),
-        kickoffUtc: new Date(f.fixture.date).toISOString(),
-        status: s,
-        homeScore: f.goals.home,
-        awayScore: f.goals.away,
-        winner,
-      };
-    }),
+    fixtures: (data.matches ?? []).map(m => ({
+      externalProviderId: String(m.id),
+      kickoffUtc: m.utcDate,
+      status: statusMap[m.status] ?? 'scheduled',
+      homeScore: m.score.fullTime.home,
+      awayScore: m.score.fullTime.away,
+      winner: m.score.winner === 'HOME_TEAM' ? 'home'
+            : m.score.winner === 'AWAY_TEAM' ? 'away'
+            : m.score.winner === 'DRAW' ? 'draw'
+            : 'unknown',
+    })),
   };
 }
 
