@@ -3,13 +3,9 @@ import FixtureRow from '../components/FixtureRow'
 import type { Fixture } from '../types'
 
 interface SyncResult {
-  fixtures_fetched: number
   fixtures_updated: number
-  fixtures_not_matched: number
   bets_auto_settled: number
   bets_needing_settlement: number
-  provider: string
-  api_debug: string
   errors: string[]
 }
 
@@ -96,9 +92,8 @@ export default function ResultsPage() {
 
       {syncResult && (
         <div className={`alert ${syncResult.errors.length > 0 ? 'alert-warn' : syncResult.fixtures_updated > 0 ? 'alert-success' : 'alert-info'}`}>
-          <div>Provider: <strong>{syncResult.provider}</strong> · Fetched: <strong>{syncResult.fixtures_fetched}</strong> · Updated: <strong>{syncResult.fixtures_updated}</strong> · Unmatched: <strong>{syncResult.fixtures_not_matched}</strong></div>
-          <div className="mt-1">Bets settled: <strong>{syncResult.bets_auto_settled}</strong> · Need manual: <strong>{syncResult.bets_needing_settlement}</strong></div>
-          {syncResult.api_debug && <div className="mt-1 text-xs text-muted">{syncResult.api_debug}</div>}
+          Updated {syncResult.fixtures_updated} fixtures · Auto-settled {syncResult.bets_auto_settled} bets
+          {syncResult.bets_needing_settlement > 0 && <> · {syncResult.bets_needing_settlement} need manual settlement</>}
           {syncResult.errors.length > 0 && <div className="mt-1 text-xs">{syncResult.errors.join(', ')}</div>}
         </div>
       )}

@@ -155,13 +155,9 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   }
 
   return json({
-    fixtures_fetched: providerFixtures.length,
     fixtures_updated: fixturesUpdated,
-    fixtures_not_matched: fixturesNotMatched,
     bets_auto_settled: betsAutoSettled,
     bets_needing_settlement: betsNeedingSettlement,
-    provider: ctx.env.RESULTS_PROVIDER ?? 'not set',
-    api_debug: providerDebug,
     errors,
   });
 };
