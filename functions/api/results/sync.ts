@@ -103,16 +103,25 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   for (const pf of providerFixtures) {
     try {
       // Try matching by external ID first (fast), fall back to kickoff time (first sync)
-      let existing = await db.prepare('SELECT id FROM fixtures WHERE external_provider_id = ?')
-        .bind(pf.externalProviderId).first<{ id: number }>();
+      let existing = await db.prepare('SELECT id, status, home_score, away_score, winner, external_provider_id FROM fixtures WHERE external_provider_id = ?')
+        .bind(pf.externalProviderId).first<{ id: number; status: string; home_score: number | null; away_score: number | null; winner: string | null; external_provider_id: string | null }>();
 
       if (!existing) {
         // Normalise both sides via SQLite datetime() to ignore sub-second differences
-        existing = await db.prepare("SELECT id FROM fixtures WHERE datetime(kickoff_utc) = datetime(?)")
-          .bind(pf.kickoffUtc).first<{ id: number }>();
+        existing = await db.prepare("SELECT id, status, home_score, away_score, winner, external_provider_id FROM fixtures WHERE datetime(kickoff_utc) = datetime(?)")
+          .bind(pf.kickoffUtc).first<{ id: number; status: string; home_score: number | null; away_score: number | null; winner: string | null; external_provider_id: string | null }>();
       }
 
       if (!existing) { fixturesNotMatched++; continue; }
+
+      const changed =
+        existing.status !== pf.status ||
+        existing.home_score !== pf.homeScore ||
+        existing.away_score !== pf.awayScore ||
+        existing.winner !== pf.winner ||
+        existing.external_provider_id !== pf.externalProviderId;
+
+      if (!changed) continue;
 
       await db.prepare(`
         UPDATE fixtures
