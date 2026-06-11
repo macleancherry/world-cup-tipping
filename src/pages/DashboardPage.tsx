@@ -99,7 +99,7 @@ export default function DashboardPage() {
         {/* Tonight's games */}
         <div className="card dashboard-fixtures-card">
           <div className="card-header">
-            <span className="card-title">🌙 Tonight's Games</span>
+            <span className="card-title">Upcoming Games</span>
             <span className="badge badge-scheduled">{upcoming_fixtures.length}</span>
           </div>
           {upcoming_fixtures.length === 0 ? (
@@ -140,7 +140,7 @@ export default function DashboardPage() {
                   className="btn btn-primary btn-block"
                   style={{ marginTop: '0.75rem' }}
                 >
-                  + Add a Bet on Tonight's Games
+                  + Add a Bet on Upcoming Games
                 </Link>
               )}
             </div>
@@ -150,7 +150,7 @@ export default function DashboardPage() {
         {/* This morning's results */}
         <div className="card dashboard-matchday-card">
           <div className="card-header">
-            <span className="card-title">☀️ This Morning's Results</span>
+            <span className="card-title">Recent Results</span>
             <span className="badge badge-scheduled">{recent_fixtures.length}</span>
           </div>
           {recent_fixtures.length === 0 ? (
