@@ -1,0 +1,59 @@
+import type { PagesFunction } from '@cloudflare/workers-types';
+import type { Env } from './_middleware';
+
+export const onRequestGet: PagesFunction<Env> = async (ctx) => {
+  const db = ctx.env.DB;
+  const tz = ctx.env.TIMEZONE || 'Australia/Perth';
+
+  const perthNow = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
+  const todayDate = perthNow.toISOString().split('T')[0];
+
+  const kittyRow = await db.prepare('SELECT COALESCE(SUM(amount),0) as total FROM kitty_transactions').first<{ total: number }>();
+  const balance = kittyRow?.total ?? 0;
+
+  const settingsRows = await db.prepare('SELECT key, value FROM settings').all<{ key: string; value: string }>();
+  const settings: Record<string, string> = {};
+  for (const r of settingsRows.results) settings[r.key] = r.value;
+
+  const startingKitty = parseInt(settings.starting_kitty ?? '20000');
+
+  const stakeRow = await db.prepare(`SELECT COALESCE(SUM(ABS(amount)),0) as total FROM kitty_transactions WHERE type = 'stake_placed'`).first<{ total: number }>();
+  const returnRow = await db.prepare(`SELECT COALESCE(SUM(amount),0) as total FROM kitty_transactions WHERE type IN ('bet_return','bet_void_refund','cashout_return')`).first<{ total: number }>();
+  const totalStaked = stakeRow?.total ?? 0;
+  const totalReturned = returnRow?.total ?? 0;
+
+  const pendingBets = await db.prepare(`SELECT b.*, p.name as participant_name FROM bets b LEFT JOIN participants p ON b.participant_id = p.id WHERE b.settlement_status = 'pending' ORDER BY b.created_at DESC LIMIT 20`).all();
+
+  const needsSettlement = await db.prepare(`
+    SELECT DISTINCT b.* FROM bets b
+    JOIN bet_fixture_links bfl ON bfl.bet_id = b.id
+    JOIN fixtures f ON f.id = bfl.fixture_id
+    WHERE b.settlement_status = 'pending' AND f.status = 'finished'
+    LIMIT 20
+  `).all();
+
+  const todayMD = await db.prepare(`SELECT md.*, p.name as assigned_participant_name FROM match_days md LEFT JOIN participants p ON md.assigned_participant_id = p.id WHERE md.local_date = ?`).bind(todayDate).first();
+
+  const todayFixtures = await db.prepare('SELECT * FROM fixtures WHERE kickoff_local_date = ? ORDER BY kickoff_utc').bind(todayDate).all();
+
+  const todayStakedRow = todayMD ? await db.prepare(`SELECT COALESCE(SUM(ABS(kt.amount)),0) as total FROM kitty_transactions kt JOIN bets b ON kt.bet_id = b.id WHERE kt.type = 'stake_placed' AND b.match_day_id = ?`).bind((todayMD as Record<string, unknown>).id).first<{ total: number }>() : null;
+
+  const todayStaked = todayStakedRow?.total ?? 0;
+  const todayBudget = (todayMD as Record<string, unknown> | null)?.budget_amount ?? 500;
+
+  return new Response(JSON.stringify({
+    kitty: {
+      balance,
+      starting_kitty: startingKitty,
+      total_staked: totalStaked,
+      total_returned: totalReturned,
+      net_profit_loss: balance - startingKitty,
+      pending_bets_count: pendingBets.results.length,
+      unsettled_completed_count: needsSettlement.results.length,
+    },
+    today_match_day: todayMD ? { ...todayMD, today_staked: todayStaked, today_budget: todayBudget } : null,
+    today_fixtures: todayFixtures.results,
+    pending_bets: pendingBets.results,
+    needs_settlement: needsSettlement.results,
+  }), { headers: { 'Content-Type': 'application/json' } });
+};

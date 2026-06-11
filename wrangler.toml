@@ -1,0 +1,15 @@
+name = "world-cup-tipping"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "./dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "world-cup-tipping"
+database_id = "your-d1-database-id"
+
+[vars]
+TIMEZONE = "Australia/Perth"
+ALLOW_PUBLIC_READONLY = "false"
+ENABLE_AUTO_SETTLEMENT = "true"
+DEFAULT_CURRENCY = "AUD"
+RESULTS_PROVIDER = "manual"
