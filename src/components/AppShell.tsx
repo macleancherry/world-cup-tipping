@@ -7,7 +7,13 @@ export default function AppShell() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <a href="/" className="logo">⚽ Kitty Tracker</a>
+        <a href="/" className="logo">
+          <div className="logo-badge">🦘</div>
+          <span>
+            <span className="logo-text-main">Socceroos</span>{' '}
+            <span className="logo-text-sub">Kitty</span>
+          </span>
+        </a>
         <nav className="app-nav desktop-nav">
           <NavLink to="/" end>Dashboard</NavLink>
           <NavLink to="/match-days">Match Days</NavLink>

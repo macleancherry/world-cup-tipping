@@ -27,9 +27,15 @@ export default function LoginPage() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-logo">
-          <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>⚽</div>
-          <h1>Kitty Tracker</h1>
-          <p>World Cup 2026 Betting Pool</p>
+          <div className="socceroos-badge">🦘</div>
+          <div className="southern-cross">★ ★ ★ ★ ★</div>
+          <h1>Socceroos Kitty</h1>
+          <p>World Cup 2026 · Betting Pool</p>
+          <div className="mascot-row" title="Maple · Zayu · Clutch — WC26 Mascots">
+            🦌 <span className="mascot-divider">·</span>
+            🐆 <span className="mascot-divider">·</span>
+            🦅
+          </div>
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}
