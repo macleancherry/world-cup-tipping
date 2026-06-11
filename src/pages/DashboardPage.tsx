@@ -21,7 +21,8 @@ interface DashboardData {
     today_staked: number
     today_budget: number
   } | null
-  today_fixtures: Fixture[]
+  upcoming_fixtures: Fixture[]
+  recent_fixtures: Fixture[]
   pending_bets: (Bet & { participant_name?: string })[]
   needs_settlement: Bet[]
 }
@@ -58,7 +59,7 @@ export default function DashboardPage() {
   if (loading) return <div className="loading-screen"><div className="spinner" /></div>
   if (!data) return <div className="alert alert-error">Failed to load dashboard</div>
 
-  const { kitty, today_match_day: today, today_fixtures, pending_bets, needs_settlement } = data
+  const { kitty, today_match_day: today, upcoming_fixtures, recent_fixtures, pending_bets, needs_settlement } = data
   const pnl = kitty.balance - kitty.starting_kitty
 
   return (
@@ -117,57 +118,64 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid-2 dashboard-today-grid">
-        {/* Today's match day */}
-        <div className="card dashboard-matchday-card">
-          <div className="card-header">
-            <span className="card-title">Today's Match Day</span>
-            {today && <Link to={`/match-days/${today.id}`} className="btn btn-sm btn-primary">+ Add Bet</Link>}
-          </div>
-          {today ? (
-            <>
-              <div className="font-bold text-lg">{formatDate(today.local_date)}</div>
-              {today.assigned_participant_name && (
-                <div className="text-sm text-secondary mt-1">Bettor: <strong>{today.assigned_participant_name}</strong></div>
-              )}
-              <div className="mt-3">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-muted">Budget used</span>
-                  <span>{formatCents(today.today_staked)} / {formatCents(today.today_budget)}</span>
-                </div>
-                <div className="progress-bar">
-                  <div
-                    className={`progress-fill ${today.today_staked / today.today_budget > 0.8 ? 'danger' : today.today_staked / today.today_budget > 0.5 ? 'warning' : ''}`}
-                    style={{ width: `${Math.min(100, (today.today_staked / today.today_budget) * 100)}%` }}
-                  />
-                </div>
-                <div className="text-xs text-muted mt-1">
-                  {formatCents(Math.max(0, today.today_budget - today.today_staked))} remaining
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="empty-state">
-              <p>No match day today</p>
-            </div>
-          )}
-        </div>
-
-        {/* Today's fixtures */}
+        {/* Tonight's games */}
         <div className="card dashboard-fixtures-card">
           <div className="card-header">
-            <span className="card-title">Today's Fixtures</span>
-            <span className="badge badge-scheduled">{today_fixtures.length}</span>
+            <span className="card-title">🌙 Tonight's Games</span>
+            <span className="badge badge-scheduled">{upcoming_fixtures.length}</span>
           </div>
-          {today_fixtures.length === 0 ? (
-            <div className="empty-state"><p>No fixtures today</p></div>
+          {upcoming_fixtures.length === 0 ? (
+            <div className="empty-state"><p>No upcoming games in the next 24 hours</p></div>
           ) : (
-            today_fixtures.map(f => (
+            upcoming_fixtures.map(f => (
               <div key={f.id} className="fixture-row" style={{ marginBottom: '0.5rem' }}>
                 <div className="fixture-time">{formatKickoff(f.kickoff_utc)}</div>
                 <div className="fixture-teams">
                   <span className="fixture-team home">{f.home_team}</span>
                   <div className="fixture-score">
-                    {f.status !== 'scheduled' ? (
+                    <span className="fixture-score-sep" style={{ fontSize: '0.8rem' }}>vs</span>
+                  </div>
+                  <span className="fixture-team away">{f.away_team}</span>
+                </div>
+              </div>
+            ))
+          )}
+          {today && (
+            <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-muted">Today's budget used</span>
+                <span>{formatCents(today.today_staked)} / {formatCents(today.today_budget)}</span>
+              </div>
+              <div className="progress-bar">
+                <div
+                  className={`progress-fill ${today.today_staked / today.today_budget > 0.8 ? 'danger' : today.today_staked / today.today_budget > 0.5 ? 'warning' : ''}`}
+                  style={{ width: `${Math.min(100, (today.today_staked / today.today_budget) * 100)}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-muted mt-1">
+                <span>{formatCents(Math.max(0, today.today_budget - today.today_staked))} remaining</span>
+                {today.assigned_participant_name && <span>Bettor: {today.assigned_participant_name}</span>}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* This morning's results */}
+        <div className="card dashboard-matchday-card">
+          <div className="card-header">
+            <span className="card-title">☀️ This Morning's Results</span>
+            <span className="badge badge-scheduled">{recent_fixtures.length}</span>
+          </div>
+          {recent_fixtures.length === 0 ? (
+            <div className="empty-state"><p>No games in the last 24 hours</p></div>
+          ) : (
+            recent_fixtures.map(f => (
+              <div key={f.id} className="fixture-row" style={{ marginBottom: '0.5rem' }}>
+                <div className="fixture-time">{formatKickoff(f.kickoff_utc)}</div>
+                <div className="fixture-teams">
+                  <span className="fixture-team home">{f.home_team}</span>
+                  <div className="fixture-score">
+                    {f.status === 'finished' ? (
                       <>{f.home_score ?? 0}<span className="fixture-score-sep">–</span>{f.away_score ?? 0}</>
                     ) : (
                       <span className="fixture-score-sep" style={{ fontSize: '0.8rem' }}>vs</span>
