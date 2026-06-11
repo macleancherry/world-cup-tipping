@@ -529,6 +529,60 @@ tr:hover td { background: var(--bg-elevated); }
 .progress-fill.warning { background: var(--accent-yellow); }
 .progress-fill.danger { background: var(--accent-red); }
 
+/* Mobile-first layout helpers */
+@media (max-width: 600px) {
+  .kitty-hero {
+    padding: 1rem 1rem 1.25rem;
+  }
+  .kitty-hero-amount {
+    font-size: 2.25rem;
+    margin-bottom: 0.4rem;
+  }
+  .kitty-hero-label {
+    font-size: 0.7rem;
+  }
+
+  /* Horizontal scrollable stat strip on mobile */
+  .stats-strip {
+    display: flex !important;
+    overflow-x: auto;
+    gap: 0.5rem;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 0.25rem;
+    grid-template-columns: unset !important;
+  }
+  .stats-strip::-webkit-scrollbar { display: none; }
+  .stats-strip .stat-card {
+    flex: 0 0 auto;
+    min-width: 110px;
+    padding: 0.75rem 0.875rem;
+  }
+  .stats-strip .stat-value {
+    font-size: 1.3rem;
+  }
+  .stats-strip .stat-label {
+    font-size: 0.68rem;
+  }
+
+  /* Reorder dashboard fixtures above match-day card on mobile */
+  .dashboard-today-grid {
+    display: flex !important;
+    flex-direction: column;
+  }
+  .dashboard-fixtures-card { order: -1; }
+  .dashboard-matchday-card { order: 0; }
+
+  /* Match day detail: fixtures above stats */
+  .matchday-layout {
+    display: flex;
+    flex-direction: column;
+  }
+  .matchday-fixtures { order: -1; }
+  .matchday-stats { order: 0; }
+  .matchday-bets { order: 1; }
+}
+
 /* Misc utils */
 .mt-1 { margin-top: 0.25rem; } .mt-2 { margin-top: 0.5rem; } .mt-3 { margin-top: 0.75rem; } .mt-4 { margin-top: 1rem; }
 .mb-1 { margin-bottom: 0.25rem; } .mb-2 { margin-bottom: 0.5rem; } .mb-3 { margin-bottom: 0.75rem; } .mb-4 { margin-bottom: 1rem; }
