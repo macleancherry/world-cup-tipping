@@ -3,6 +3,7 @@ import type { Env } from '../_middleware';
 
 interface ProviderFixture {
   externalProviderId: string;
+  kickoffUtc: string;
   status: string;
   homeScore: number | null;
   awayScore: number | null;
@@ -17,7 +18,7 @@ async function fetchFromProvider(env: Env): Promise<ProviderFixture[]> {
   });
   if (!res.ok) throw new Error(`Provider API error: ${res.status}`);
   const data = await res.json() as { response: Array<{
-    fixture: { id: number; status: { short: string } };
+    fixture: { id: number; date: string; status: { short: string } };
     goals: { home: number | null; away: number | null };
     teams: { home: { winner: boolean | null }; away: { winner: boolean | null } };
   }> };
@@ -35,7 +36,14 @@ async function fetchFromProvider(env: Env): Promise<ProviderFixture[]> {
       else if (f.teams.away.winner === true) winner = 'away';
       else winner = 'draw';
     }
-    return { externalProviderId: String(f.fixture.id), status: s, homeScore: f.goals.home, awayScore: f.goals.away, winner };
+    return {
+      externalProviderId: String(f.fixture.id),
+      kickoffUtc: new Date(f.fixture.date).toISOString(),
+      status: s,
+      homeScore: f.goals.home,
+      awayScore: f.goals.away,
+      winner,
+    };
   });
 }
 
@@ -79,10 +87,24 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
 
   for (const pf of providerFixtures) {
     try {
-      const existing = await db.prepare('SELECT id FROM fixtures WHERE external_provider_id = ?').bind(pf.externalProviderId).first();
+      // Try matching by external ID first (fast), fall back to kickoff time (first sync)
+      let existing = await db.prepare('SELECT id FROM fixtures WHERE external_provider_id = ?')
+        .bind(pf.externalProviderId).first<{ id: number }>();
+
+      if (!existing) {
+        existing = await db.prepare('SELECT id FROM fixtures WHERE kickoff_utc = ?')
+          .bind(pf.kickoffUtc).first<{ id: number }>();
+      }
+
       if (!existing) continue;
-      await db.prepare(`UPDATE fixtures SET status = ?, home_score = ?, away_score = ?, winner = ?, last_synced_at = datetime('now'), updated_at = datetime('now') WHERE external_provider_id = ?`
-      ).bind(pf.status, pf.homeScore, pf.awayScore, pf.winner, pf.externalProviderId).run();
+
+      await db.prepare(`
+        UPDATE fixtures
+        SET status = ?, home_score = ?, away_score = ?, winner = ?,
+            external_provider_id = ?,
+            last_synced_at = datetime('now'), updated_at = datetime('now')
+        WHERE id = ?
+      `).bind(pf.status, pf.homeScore, pf.awayScore, pf.winner, pf.externalProviderId, existing.id).run();
       fixturesUpdated++;
     } catch (e) {
       errors.push(`Fixture ${pf.externalProviderId}: ${(e as Error).message}`);
