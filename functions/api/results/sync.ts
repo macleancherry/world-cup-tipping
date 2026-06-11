@@ -74,6 +74,7 @@ function canAutoSettle(bet: Record<string, unknown>, fixture: Record<string, unk
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   const db = ctx.env.DB;
   let fixturesUpdated = 0;
+  let fixturesNotMatched = 0;
   let betsAutoSettled = 0;
   let betsNeedingSettlement = 0;
   const errors: string[] = [];
@@ -97,7 +98,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
           .bind(pf.kickoffUtc).first<{ id: number }>();
       }
 
-      if (!existing) continue;
+      if (!existing) { fixturesNotMatched++; continue; }
 
       await db.prepare(`
         UPDATE fixtures
@@ -139,7 +140,15 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     betsAutoSettled++;
   }
 
-  return json({ fixtures_updated: fixturesUpdated, bets_auto_settled: betsAutoSettled, bets_needing_settlement: betsNeedingSettlement, errors });
+  return json({
+    fixtures_fetched: providerFixtures.length,
+    fixtures_updated: fixturesUpdated,
+    fixtures_not_matched: fixturesNotMatched,
+    bets_auto_settled: betsAutoSettled,
+    bets_needing_settlement: betsNeedingSettlement,
+    provider: ctx.env.RESULTS_PROVIDER ?? 'not set',
+    errors,
+  });
 };
 
 function json(d: unknown, s = 200) {
