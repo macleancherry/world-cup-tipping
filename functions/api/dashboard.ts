@@ -35,16 +35,18 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   const todayMD = await db.prepare(`SELECT md.*, p.name as assigned_participant_name FROM match_days md LEFT JOIN participants p ON md.assigned_participant_id = p.id WHERE md.local_date = ?`).bind(todayDate).first();
 
   const now = new Date().toISOString();
-  const plus24h = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-  const minus24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const plus36h = new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString();
+  const minus48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
 
+  // Unplayed games — scheduled only, next 36h covers today + overnight
   const upcomingFixtures = await db.prepare(
-    'SELECT * FROM fixtures WHERE kickoff_utc > ? AND kickoff_utc <= ? ORDER BY kickoff_utc LIMIT 20'
-  ).bind(now, plus24h).all();
+    "SELECT * FROM fixtures WHERE status = 'scheduled' AND kickoff_utc > ? AND kickoff_utc <= ? ORDER BY kickoff_utc LIMIT 20"
+  ).bind(now, plus36h).all();
 
+  // Played games — finished or live, last 48h
   const recentFixtures = await db.prepare(
-    'SELECT * FROM fixtures WHERE kickoff_utc >= ? AND kickoff_utc < ? ORDER BY kickoff_utc DESC LIMIT 10'
-  ).bind(minus24h, now).all();
+    "SELECT * FROM fixtures WHERE status IN ('finished', 'in_progress') AND kickoff_utc >= ? AND kickoff_utc < ? ORDER BY kickoff_utc DESC LIMIT 10"
+  ).bind(minus48h, now).all();
 
   const todayStakedRow = todayMD ? await db.prepare(`SELECT COALESCE(SUM(ABS(kt.amount)),0) as total FROM kitty_transactions kt JOIN bets b ON kt.bet_id = b.id WHERE kt.type = 'stake_placed' AND b.match_day_id = ?`).bind((todayMD as Record<string, unknown>).id).first<{ total: number }>() : null;
 
