@@ -100,7 +100,6 @@ export default function MatchDaysPage() {
                     {day.assigned_participant_name && (
                       <span>👤 {day.assigned_participant_name}</span>
                     )}
-                    <span>Budget: {formatCents(day.budget_amount)}</span>
                     {day.total_staked > 0 && (
                       <span>Staked: {formatCents(day.total_staked)}</span>
                     )}

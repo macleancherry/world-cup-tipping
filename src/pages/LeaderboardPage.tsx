@@ -92,11 +92,8 @@ export default function LeaderboardPage() {
                   <tr>
                     <th>#</th>
                     <th>Name</th>
-                    <th>Bets</th>
-                    <th>Staked</th>
-                    <th>Returned</th>
                     <th>Net P&L</th>
-                    <th>W/L/V</th>
+                    <th>W / L</th>
                     <th>Win %</th>
                   </tr>
                 </thead>
@@ -105,17 +102,13 @@ export default function LeaderboardPage() {
                     <tr key={s.id}>
                       <td>{medals[i] ?? i + 1}</td>
                       <td className="font-semibold" style={{ color: 'var(--text-primary)' }}>{s.name}</td>
-                      <td>{s.bets_placed}</td>
-                      <td>{formatCents(s.total_staked)}</td>
-                      <td>{formatCents(s.total_returned)}</td>
                       <td className={s.net_pl >= 0 ? 'text-green' : 'text-red'}>
                         {s.net_pl >= 0 ? '+' : ''}{formatCents(s.net_pl)}
                       </td>
                       <td>
                         <span className="text-green">{s.won}</span>
-                        <span className="text-muted">/</span>
+                        <span className="text-muted"> / </span>
                         <span className="text-red">{s.lost}</span>
-                        <span className="text-muted">/{s.void}</span>
                       </td>
                       <td>{s.win_rate}%</td>
                     </tr>

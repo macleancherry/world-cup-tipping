@@ -27,11 +27,6 @@ export default function MatchDayDetailPage() {
   const [loading, setLoading] = useState(true)
   const [showBetForm, setShowBetForm] = useState(false)
   const [settlingBet, setSettlingBet] = useState<Bet | null>(null)
-  const [editingDay, setEditingDay] = useState(false)
-  const [editBudget, setEditBudget] = useState('')
-  const [editParticipant, setEditParticipant] = useState<number | ''>('')
-  const [editNotes, setEditNotes] = useState('')
-  const [saving, setSaving] = useState(false)
 
   async function load() {
     const [dayRes, partsRes] = await Promise.all([
@@ -42,29 +37,10 @@ export default function MatchDayDetailPage() {
     const partsData = await partsRes.json() as Participant[]
     setDay(dayData)
     setParticipants(partsData)
-    setEditBudget(String(dayData.budget_amount / 100))
-    setEditParticipant(dayData.assigned_participant_id ?? '')
-    setEditNotes(dayData.notes ?? '')
     setLoading(false)
   }
 
   useEffect(() => { load() }, [id])
-
-  async function saveDay() {
-    setSaving(true)
-    await fetch(`/api/match-days/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        budget_amount: Math.round(parseFloat(editBudget) * 100),
-        assigned_participant_id: editParticipant || null,
-        notes: editNotes || null,
-      }),
-    })
-    setSaving(false)
-    setEditingDay(false)
-    load()
-  }
 
   async function deleteBet(bet: Bet) {
     if (!confirm(`Delete bet "${bet.title}"? The stake will be returned to the kitty.`)) return
@@ -96,51 +72,14 @@ export default function MatchDayDetailPage() {
           </div>
           <div className="flex gap-2 items-center" style={{ flexWrap: 'wrap' }}>
             <span className="deadline-chip">📋 Submit by 9pm AEST</span>
-            <button className="btn btn-ghost btn-sm" onClick={() => setEditingDay(!editingDay)}>
-              {editingDay ? 'Cancel' : '✏️ Edit Day'}
-            </button>
             <button className="btn btn-primary" onClick={() => setShowBetForm(true)}>+ Add Bet</button>
           </div>
         </div>
       </div>
 
-      {/* Edit day panel */}
-      {editingDay && (
-        <div className="card mb-4">
-          <div className="section-title">Edit Match Day</div>
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Daily budget ($)</label>
-              <input
-                type="number"
-                className="form-input"
-                value={editBudget}
-                onChange={e => setEditBudget(e.target.value)}
-                step="1"
-                min="0"
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Assigned bettor</label>
-              <select className="form-select" value={editParticipant} onChange={e => setEditParticipant(e.target.value ? Number(e.target.value) : '')}>
-                <option value="">— unassigned —</option>
-                {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Notes</label>
-            <input type="text" className="form-input" value={editNotes} onChange={e => setEditNotes(e.target.value)} />
-          </div>
-          <button className="btn btn-primary" onClick={saveDay} disabled={saving}>
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-        </div>
-      )}
-
       <div className="matchday-layout">
       {/* Day summary */}
-      <div className="grid-3 mb-4 matchday-stats">
+      <div className="grid-3 stats-strip mb-4 matchday-stats">
         <div className="stat-card">
           <div className="stat-label">Budget</div>
           <div className="stat-value">{formatCents(day.budget_amount)}</div>

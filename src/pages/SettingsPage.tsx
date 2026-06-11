@@ -56,11 +56,24 @@ export default function SettingsPage() {
   async function saveSettings() {
     if (!settings) return
     setSaving(true)
-    // Settings are stored per-key via PUT /api/kitty... actually we need a settings endpoint
-    // For MVP, post a manual adjustment for starting kitty change via export/import workaround
-    // Instead: patch each key via a generic settings endpoint — not built yet, so use a direct approach
-    // We'll just show success (settings saved to DB on init, edits require re-import for now)
-    // TODO: add PUT /api/settings endpoint
+    const tocents = (v: string) => String(Math.round(parseFloat(v) * 100))
+    const calculated_kitty = tocents(String(parseFloat(settings.contribution_per_person) * parseInt(settings.num_participants)))
+    await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        starting_kitty: calculated_kitty,
+        contribution_per_person: tocents(settings.contribution_per_person),
+        num_participants: settings.num_participants,
+        group_stage_daily_budget: tocents(settings.group_stage_daily_budget),
+        r32_daily_budget: tocents(settings.r32_daily_budget),
+        r16_daily_budget: tocents(settings.r16_daily_budget),
+        qf_daily_budget: tocents(settings.qf_daily_budget),
+        sf_daily_budget: tocents(settings.sf_daily_budget),
+        tp_daily_budget: tocents(settings.tp_daily_budget),
+        final_daily_budget: tocents(settings.final_daily_budget),
+      }),
+    })
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
