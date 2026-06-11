@@ -92,7 +92,8 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
         .bind(pf.externalProviderId).first<{ id: number }>();
 
       if (!existing) {
-        existing = await db.prepare('SELECT id FROM fixtures WHERE kickoff_utc = ?')
+        // Normalise both sides via SQLite datetime() to ignore sub-second differences
+        existing = await db.prepare("SELECT id FROM fixtures WHERE datetime(kickoff_utc) = datetime(?)")
           .bind(pf.kickoffUtc).first<{ id: number }>();
       }
 
