@@ -24,6 +24,12 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   if (!Array.isArray(body.fixtures)) return json({ error: 'fixtures array required' }, 400);
 
   const tz = ctx.env.TIMEZONE || 'Australia/Perth';
+
+  // Clear existing fixture data, preserving match_days that have bets
+  await ctx.env.DB.prepare('DELETE FROM bet_fixture_links').run();
+  await ctx.env.DB.prepare('DELETE FROM fixtures').run();
+  await ctx.env.DB.prepare('DELETE FROM match_days WHERE id NOT IN (SELECT DISTINCT match_day_id FROM bets)').run();
+
   let inserted = 0;
   let skipped = 0;
 
@@ -31,7 +37,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     const localDate = toLocalDate(f.kickoffUtc, tz);
     try {
       await ctx.env.DB.prepare(`
-        INSERT OR IGNORE INTO fixtures (match_number, external_provider_id, stage, group_name, round_name, home_team, away_team, kickoff_utc, kickoff_local_date, venue, city)
+        INSERT INTO fixtures (match_number, external_provider_id, stage, group_name, round_name, home_team, away_team, kickoff_utc, kickoff_local_date, venue, city)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(f.matchNumber, f.externalProviderId, f.stage, f.groupName, f.roundName, f.homeTeam, f.awayTeam, f.kickoffUtc, localDate, f.venue, f.city).run();
 
