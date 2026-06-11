@@ -554,6 +554,7 @@ tr:hover td { background: var(--bg-elevated); }
   text-align: left;
   transition: border-color 0.15s, background 0.15s;
   position: relative;
+  color: var(--text-primary);
 }
 .fixture-picker-btn:hover { border-color: var(--text-muted); }
 .fixture-picker-btn.selected {
