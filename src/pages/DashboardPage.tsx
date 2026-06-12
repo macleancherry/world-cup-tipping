@@ -215,18 +215,36 @@ export default function DashboardPage() {
           {upcoming_fixtures.length === 0 ? (
             <div className="empty-state"><p>No upcoming games in the next 36 hours</p></div>
           ) : (
-            upcoming_fixtures.map(f => (
-              <div key={f.id} className="fixture-row" style={{ marginBottom: '0.5rem' }}>
-                <div className="fixture-time">{formatKickoff(f.kickoff_utc)}</div>
-                <div className="fixture-teams">
-                  <span className="fixture-team home">{f.home_team}</span>
-                  <div className="fixture-score">
-                    <span className="fixture-score-sep" style={{ fontSize: '0.8rem' }}>vs</span>
+            (() => {
+              let lastDate = ''
+              return upcoming_fixtures.map(f => {
+                const isNewDay = f.kickoff_local_date !== lastDate
+                const isFirst = lastDate === ''
+                if (isNewDay) lastDate = f.kickoff_local_date
+                const dayLabel = f.kickoff_local_date === today
+                  ? 'Today'
+                  : new Date(f.kickoff_utc).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })
+                return (
+                  <div key={f.id}>
+                    {isNewDay && (
+                      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '0.35rem 0 0.2rem', marginTop: isFirst ? 0 : '0.5rem' }}>
+                        {dayLabel}
+                      </div>
+                    )}
+                    <div className="fixture-row" style={{ marginBottom: '0.35rem' }}>
+                      <div className="fixture-time">{formatKickoff(f.kickoff_utc)}</div>
+                      <div className="fixture-teams">
+                        <span className="fixture-team home">{f.home_team}</span>
+                        <div className="fixture-score">
+                          <span className="fixture-score-sep" style={{ fontSize: '0.8rem' }}>vs</span>
+                        </div>
+                        <span className="fixture-team away">{f.away_team}</span>
+                      </div>
+                    </div>
                   </div>
-                  <span className="fixture-team away">{f.away_team}</span>
-                </div>
-              </div>
-            ))
+                )
+              })
+            })()
           )}
           {today && (
             <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
