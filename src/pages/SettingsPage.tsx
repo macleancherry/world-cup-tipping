@@ -199,10 +199,9 @@ function SettingsPageInner() {
     if (swapIdx < 0 || swapIdx >= participants.length) return
     const a = participants[index]
     const b = participants[swapIdx]
-    // Assign clean 1-based sort_orders for the two swapped positions
     await Promise.all([
-      fetch(`/api/participants/${a.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sort_order: swapIdx + 1 }) }),
-      fetch(`/api/participants/${b.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sort_order: index + 1 }) }),
+      fetch(`/api/participants/${a.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sort_order: b.sort_order }) }),
+      fetch(`/api/participants/${b.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sort_order: a.sort_order }) }),
     ])
     load()
   }
