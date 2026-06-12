@@ -1,6 +1,72 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import type { Participant } from '../types'
+
+function SettingsPinGate({ children }: { children: React.ReactNode }) {
+  const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem('settings_unlocked') === '1')
+  const [pin, setPin] = useState('')
+  const [error, setError] = useState('')
+  const [checking, setChecking] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!unlocked) setTimeout(() => inputRef.current?.focus(), 50)
+  }, [unlocked])
+
+  async function unlock() {
+    if (!pin) return
+    setChecking(true)
+    setError('')
+    try {
+      const r = await fetch('/api/settings/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin }),
+      })
+      if (r.ok) {
+        sessionStorage.setItem('settings_unlocked', '1')
+        setUnlocked(true)
+      } else {
+        setError('Incorrect PIN')
+        setPin('')
+        setTimeout(() => inputRef.current?.focus(), 50)
+      }
+    } catch {
+      setError('Could not reach server')
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  if (unlocked) return <>{children}</>
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+      <div className="card" style={{ maxWidth: 320, width: '100%', textAlign: 'center' }}>
+        <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🔒</div>
+        <h2 style={{ fontWeight: 700, marginBottom: '0.25rem' }}>Settings</h2>
+        <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+          Enter your PIN to continue
+        </p>
+        {error && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>{error}</div>}
+        <input
+          ref={inputRef}
+          type="password"
+          className="form-input"
+          placeholder="PIN"
+          value={pin}
+          onChange={e => setPin(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && unlock()}
+          style={{ textAlign: 'center', letterSpacing: '0.2em', marginBottom: '0.75rem' }}
+          inputMode="numeric"
+        />
+        <button className="btn btn-primary btn-block" onClick={unlock} disabled={checking || !pin}>
+          {checking ? 'Checking…' : 'Unlock'}
+        </button>
+      </div>
+    </div>
+  )
+}
 
 interface Settings {
   starting_kitty: string
@@ -20,6 +86,10 @@ function centsToDisplay(cents: string): string {
   return (parseInt(cents) / 100).toFixed(2)
 }
 export default function SettingsPage() {
+  return <SettingsPinGate><SettingsPageInner /></SettingsPinGate>
+}
+
+function SettingsPageInner() {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [participants, setParticipants] = useState<Participant[]>([])
   const [loading, setLoading] = useState(true)

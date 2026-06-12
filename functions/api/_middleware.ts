@@ -12,6 +12,7 @@ export interface Env {
   ALLOW_PUBLIC_READONLY: string;
   ENABLE_AUTO_SETTLEMENT: string;
   DEFAULT_CURRENCY: string;
+  SETTINGS_PIN?: string;
 }
 
 const PUBLIC_PATHS = ['/api/auth/login'];
