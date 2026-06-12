@@ -38,24 +38,31 @@ export default function DashboardPage() {
   const [syncing, setSyncing] = useState(false)
   const [cashoutFixture, setCashoutFixture] = useState<LiveFixture | null>(null)
 
-  async function syncAndLoad() {
-    try {
-      await fetch('/api/results/sync', { method: 'POST' })
-    } catch { /* ignore sync errors — stale data is fine */ }
+  async function loadData() {
     const d = await fetch('/api/dashboard').then(r => r.json())
     setData(d as DashboardData)
   }
 
+  async function syncThenRefresh() {
+    try {
+      await fetch('/api/results/sync', { method: 'POST' })
+    } catch { /* ignore sync errors — stale data is fine */ }
+    await loadData()
+  }
+
   useEffect(() => {
-    syncAndLoad().finally(() => setLoading(false))
-    const id = setInterval(syncAndLoad, 60_000)
+    // Load from DB immediately so the page is usable right away
+    loadData().finally(() => setLoading(false))
+    // Sync in background without blocking the initial render
+    syncThenRefresh()
+    const id = setInterval(syncThenRefresh, 60_000)
     return () => clearInterval(id)
   }, [])
 
   async function syncScores() {
     setSyncing(true)
     try {
-      await syncAndLoad()
+      await syncThenRefresh()
     } finally {
       setSyncing(false)
     }
