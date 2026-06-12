@@ -99,8 +99,9 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
 
   // --- Live fetch ---
   const kickoff = new Date(fixture.kickoff_utc);
-  const from = new Date(kickoff.getTime() - 3 * 60 * 60 * 1000).toISOString();
-  const to   = new Date(kickoff.getTime() + 3 * 60 * 60 * 1000).toISOString();
+  const isoZ = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const from = isoZ(new Date(kickoff.getTime() - 3 * 60 * 60 * 1000));
+  const to   = isoZ(new Date(kickoff.getTime() + 3 * 60 * 60 * 1000));
 
   const url = `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds` +
     `?apiKey=${ctx.env.ODDS_API_KEY}` +
