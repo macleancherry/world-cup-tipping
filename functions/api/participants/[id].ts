@@ -1,5 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../_middleware';
+import { recalculateRoster } from '../_roster';
 
 export const onRequestPut: PagesFunction<Env> = async (ctx) => {
   const id = ctx.params.id;
@@ -14,12 +15,14 @@ export const onRequestPut: PagesFunction<Env> = async (ctx) => {
   fields.push("updated_at = datetime('now')");
   values.push(id);
   const r = await ctx.env.DB.prepare(`UPDATE participants SET ${fields.join(', ')} WHERE id = ? RETURNING *`).bind(...values).first();
+  await recalculateRoster(ctx.env.DB);
   return json(r);
 };
 
 export const onRequestDelete: PagesFunction<Env> = async (ctx) => {
   const id = ctx.params.id;
   await ctx.env.DB.prepare('DELETE FROM participants WHERE id = ?').bind(id).run();
+  await recalculateRoster(ctx.env.DB);
   return json({ ok: true });
 };
 

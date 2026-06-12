@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { formatCents } from '../hooks/useApi'
-import type { Participant } from '../types'
+import { formatCents, formatDate } from '../hooks/useApi'
 
 interface ParticipantStats {
   id: number
@@ -16,17 +15,26 @@ interface ParticipantStats {
   win_rate: number
 }
 
+interface RosterEntry {
+  id: number
+  name: string
+  initials: string
+  sort_order: number
+  next_day: string | null
+  days_assigned: number
+}
+
 export default function LeaderboardPage() {
   const [stats, setStats] = useState<ParticipantStats[]>([])
-  const [participants, setParticipants] = useState<Participant[]>([])
+  const [roster, setRoster] = useState<RosterEntry[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/participants').then(r => r.json()) as Promise<Participant[]>,
+      fetch('/api/participants').then(r => r.json()) as Promise<any[]>,
       fetch('/api/bets').then(r => r.json()) as Promise<any[]>,
-    ]).then(([parts, bets]) => {
-      setParticipants(parts)
+      fetch('/api/roster').then(r => r.json()) as Promise<{ roster: RosterEntry[] }>,
+    ]).then(([parts, bets, rosterData]) => {
       const map = new Map<number, ParticipantStats>()
       for (const p of parts) {
         map.set(p.id, { id: p.id, name: p.name, initials: p.initials, bets_placed: 0, total_staked: 0, total_returned: 0, won: 0, lost: 0, void: 0, net_pl: 0, win_rate: 0 })
@@ -48,6 +56,7 @@ export default function LeaderboardPage() {
         win_rate: (s.won + s.lost) > 0 ? Math.round((s.won / (s.won + s.lost)) * 100) : 0,
       })).sort((a, b) => b.net_pl - a.net_pl)
       setStats(rows)
+      setRoster(rosterData.roster ?? [])
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])
@@ -55,6 +64,7 @@ export default function LeaderboardPage() {
   if (loading) return <div className="loading-screen"><div className="spinner" /></div>
 
   const medals = ['🥇', '🥈', '🥉']
+  const nextUp = roster[0]
 
   return (
     <div>
@@ -63,6 +73,63 @@ export default function LeaderboardPage() {
         <p className="page-subtitle">Performance by bettor</p>
       </div>
 
+      {/* Bettor roster */}
+      {roster.length > 0 && (
+        <div className="section mb-4">
+          <div className="section-title">Betting Roster</div>
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            {roster.map((entry, i) => {
+              const isNext = i === 0 && entry.next_day != null
+              return (
+                <div
+                  key={entry.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    padding: '0.7rem 1rem',
+                    borderBottom: i < roster.length - 1 ? '1px solid var(--border)' : 'none',
+                    background: isNext ? 'rgba(255,209,0,0.07)' : undefined,
+                  }}
+                >
+                  <span style={{ width: '1.4rem', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)', flexShrink: 0 }}>
+                    {i + 1}
+                  </span>
+                  <div
+                    style={{
+                      width: 32, height: 32, borderRadius: '50%',
+                      background: isNext ? 'var(--socceroos-gold)' : 'var(--accent-blue)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '0.75rem', fontWeight: 700,
+                      color: isNext ? '#000' : '#fff',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {entry.initials}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                      {entry.name}
+                      {isNext && <span className="badge badge-live" style={{ marginLeft: '0.5rem', fontSize: '0.65rem' }}>UP NEXT</span>}
+                    </div>
+                    {entry.next_day && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        Next: {formatDate(entry.next_day)}
+                        {entry.days_assigned > 1 && ` · ${entry.days_assigned} days in queue`}
+                      </div>
+                    )}
+                    {!entry.next_day && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No upcoming days</div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Performance leaderboard */}
       {stats.length === 0 ? (
         <div className="empty-state">
           <h3>No data yet</h3>
@@ -70,7 +137,6 @@ export default function LeaderboardPage() {
         </div>
       ) : (
         <>
-          {/* Top 3 podium */}
           <div className="grid-3 mb-4">
             {stats.slice(0, 3).map((s, i) => (
               <div key={s.id} className="stat-card" style={{ textAlign: 'center', borderColor: i === 0 ? 'var(--accent-yellow)' : undefined }}>
@@ -84,7 +150,6 @@ export default function LeaderboardPage() {
             ))}
           </div>
 
-          {/* Full table */}
           <div className="card">
             <div className="table-wrapper">
               <table>
@@ -118,18 +183,6 @@ export default function LeaderboardPage() {
             </div>
           </div>
         </>
-      )}
-
-      {/* Participants without bets */}
-      {participants.filter(p => !stats.find(s => s.id === p.id && s.bets_placed > 0)).length > 0 && (
-        <div className="section mt-4">
-          <div className="section-title text-muted">No bets yet</div>
-          <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
-            {participants.filter(p => !stats.find(s => s.id === p.id && s.bets_placed > 0)).map(p => (
-              <div key={p.id} className="badge badge-void">{p.name}</div>
-            ))}
-          </div>
-        </div>
       )}
     </div>
   )

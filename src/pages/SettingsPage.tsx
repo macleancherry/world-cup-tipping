@@ -89,18 +89,34 @@ export default function SettingsPage() {
   return <SettingsPinGate><SettingsPageInner /></SettingsPinGate>
 }
 
+interface RosterEntry {
+  id: number
+  name: string
+  initials: string
+  next_day: string | null
+  contribution_paid: number
+}
+
 function SettingsPageInner() {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [participants, setParticipants] = useState<Participant[]>([])
+  const [roster, setRoster] = useState<RosterEntry[]>([])
+  const [contributionOwed, setContributionOwed] = useState(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [newParticipant, setNewParticipant] = useState('')
   const [addingParticipant, setAddingParticipant] = useState(false)
+  const [recalculating, setRecalculating] = useState(false)
 
   async function load() {
-    const partsRes = await fetch('/api/participants').then(r => r.json()) as Participant[]
+    const [partsRes, rosterRes] = await Promise.all([
+      fetch('/api/participants').then(r => r.json()) as Promise<Participant[]>,
+      fetch('/api/roster').then(r => r.json()) as Promise<{ roster: RosterEntry[]; contribution_owed: number }>,
+    ])
     setParticipants(partsRes)
+    setRoster(rosterRes.roster ?? [])
+    setContributionOwed(rosterRes.contribution_owed)
 
     // Load settings from the DB
     const exp = await fetch('/api/export').then(r => r.json()) as { settings: { key: string; value: string }[] }
@@ -178,6 +194,39 @@ function SettingsPageInner() {
     load()
   }
 
+  async function moveParticipant(index: number, direction: -1 | 1) {
+    const swapIdx = index + direction
+    if (swapIdx < 0 || swapIdx >= participants.length) return
+    const a = participants[index]
+    const b = participants[swapIdx]
+    // Assign clean 1-based sort_orders for the two swapped positions
+    await Promise.all([
+      fetch(`/api/participants/${a.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sort_order: swapIdx + 1 }) }),
+      fetch(`/api/participants/${b.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sort_order: index + 1 }) }),
+    ])
+    load()
+  }
+
+  async function recalculateRoster() {
+    setRecalculating(true)
+    await fetch('/api/match-days/recalculate-roster', { method: 'POST' })
+    setRecalculating(false)
+    load()
+  }
+
+  async function recordContribution(participantId: number, name: string) {
+    const amtStr = prompt(`Record payment from ${name} ($):`)
+    if (!amtStr) return
+    const amount = Math.round(parseFloat(amtStr) * 100)
+    if (isNaN(amount) || amount <= 0) { alert('Invalid amount'); return }
+    await fetch('/api/roster/contribution', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ participant_id: participantId, amount }),
+    })
+    load()
+  }
+
   async function addManualAdjustment() {
     const amt = prompt('Amount (positive to add, negative to remove, in $):')
     if (!amt) return
@@ -207,27 +256,46 @@ function SettingsPageInner() {
         <Link to="/import-export" className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center' }}>📦 Import / Export</Link>
       </div>
 
-      {/* Participants */}
+      {/* Participants & Roster Order */}
       <div className="card mb-4">
         <div className="card-header">
-          <span className="card-title">Participants</span>
+          <span className="card-title">Participants & Betting Order</span>
           <span className="badge badge-scheduled">{participants.filter(p => p.active).length} active</span>
         </div>
+        <p className="text-xs text-muted" style={{ marginBottom: '0.75rem' }}>
+          Use ▲ ▼ to set the rotation order. New participants are appended to the end.
+        </p>
 
-        {participants.map(p => (
-          <div key={p.id} className="flex items-center justify-between" style={{ padding: '0.5rem 0', borderBottom: '1px solid var(--border)' }}>
+        {participants.map((p, i) => (
+          <div key={p.id} className="flex items-center justify-between" style={{ padding: '0.4rem 0', borderBottom: '1px solid var(--border)' }}>
             <div className="flex items-center gap-2">
+              {/* Reorder arrows */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ padding: '0 0.3rem', fontSize: '0.65rem', lineHeight: 1, minHeight: 0, opacity: i === 0 ? 0.2 : 1 }}
+                  onClick={() => moveParticipant(i, -1)}
+                  disabled={i === 0}
+                >▲</button>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ padding: '0 0.3rem', fontSize: '0.65rem', lineHeight: 1, minHeight: 0, opacity: i === participants.length - 1 ? 0.2 : 1 }}
+                  onClick={() => moveParticipant(i, 1)}
+                  disabled={i === participants.length - 1}
+                >▼</button>
+              </div>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', width: '1rem' }}>{i + 1}</span>
               <div
                 style={{
-                  width: 32, height: 32, borderRadius: '50%',
+                  width: 30, height: 30, borderRadius: '50%',
                   background: p.active ? 'var(--accent-blue)' : 'var(--border)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '0.75rem', fontWeight: 700, color: '#fff', flexShrink: 0,
+                  fontSize: '0.7rem', fontWeight: 700, color: '#fff', flexShrink: 0,
                 }}
               >
                 {p.initials}
               </div>
-              <span className={p.active ? '' : 'text-muted'}>{p.name}</span>
+              <span className={p.active ? '' : 'text-muted'} style={{ fontSize: '0.9rem' }}>{p.name}</span>
               {!p.active && <span className="badge badge-void text-xs">inactive</span>}
             </div>
             <div className="flex gap-2">
@@ -254,7 +322,53 @@ function SettingsPageInner() {
             Add
           </button>
         </div>
+        <div className="mt-3">
+          <button className="btn btn-ghost btn-sm" onClick={recalculateRoster} disabled={recalculating}>
+            {recalculating ? 'Recalculating…' : '↺ Recalculate roster assignments'}
+          </button>
+        </div>
       </div>
+
+      {/* Kitty contributions */}
+      {roster.length > 0 && (
+        <div className="card mb-4">
+          <div className="card-header">
+            <span className="card-title">Kitty Contributions</span>
+            <span className="text-xs text-muted">Each person owes {settings ? `$${(contributionOwed / 100).toFixed(2)}` : '—'}</span>
+          </div>
+          {roster.map(entry => {
+            const outstanding = Math.max(0, contributionOwed - entry.contribution_paid)
+            const paid = entry.contribution_paid >= contributionOwed
+            return (
+              <div key={entry.id} className="flex items-center justify-between" style={{ padding: '0.5rem 0', borderBottom: '1px solid var(--border)' }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                    {entry.name}
+                    {paid
+                      ? <span className="badge badge-won text-xs" style={{ marginLeft: '0.4rem' }}>Paid</span>
+                      : <span className="badge badge-pending text-xs" style={{ marginLeft: '0.4rem' }}>Owing</span>}
+                  </div>
+                  <div className="text-xs text-muted">
+                    Paid: ${(entry.contribution_paid / 100).toFixed(2)}
+                    {!paid && ` · Outstanding: $${(outstanding / 100).toFixed(2)}`}
+                  </div>
+                </div>
+                {!paid && (
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => recordContribution(entry.id, entry.name)}
+                  >
+                    + Record payment
+                  </button>
+                )}
+              </div>
+            )
+          })}
+          <div className="mt-2 text-xs text-muted">
+            Total collected: ${(roster.reduce((s, e) => s + e.contribution_paid, 0) / 100).toFixed(2)} of ${((contributionOwed * roster.length) / 100).toFixed(2)}
+          </div>
+        </div>
+      )}
 
       {/* Kitty settings */}
       {settings && (
