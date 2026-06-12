@@ -197,12 +197,14 @@ function SettingsPageInner() {
   async function moveParticipant(index: number, direction: -1 | 1) {
     const swapIdx = index + direction
     if (swapIdx < 0 || swapIdx >= participants.length) return
-    const a = participants[index]
-    const b = participants[swapIdx]
-    await Promise.all([
-      fetch(`/api/participants/${a.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sort_order: b.sort_order }) }),
-      fetch(`/api/participants/${b.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sort_order: a.sort_order }) }),
-    ])
+    const newOrder = [...participants]
+    const [moved] = newOrder.splice(index, 1)
+    newOrder.splice(swapIdx, 0, moved)
+    await fetch('/api/participants/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: newOrder.map(p => p.id) }),
+    })
     load()
   }
 
