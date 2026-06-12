@@ -46,6 +46,7 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
   const [oddsMeta, setOddsMeta] = useState<{ fetchCount: number; maxFetches: number; maxReached: boolean; fetchedAt: string; fromCache: boolean; stale?: boolean } | null>(null)
   const [oddsLoading, setOddsLoading] = useState(false)
   const [oddsError, setOddsError] = useState('')
+  const [oraclePick, setOraclePick] = useState<{ predicted_winner: 'home' | 'away'; team: string } | null>(null)
 
   const stakeNum = parseFloat(stake) || 0
   const oddsNum = parseFloat(odds) || 0
@@ -66,14 +67,26 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
     ? bettableFixtures.find(x => x.id === selectedFixtures[0])
     : undefined
 
-  // Auto-load odds whenever the selected single fixture changes
+  // Auto-load odds + oracle pick whenever the selected single fixture changes
   useEffect(() => {
     if (singleFixture) {
       loadOdds(singleFixture.id)
+      fetch(`/api/oracle/picks?fixture_id=${singleFixture.id}`)
+        .then(r => r.json())
+        .then((d: { predicted_winner?: 'home' | 'away' } | null) => {
+          if (d?.predicted_winner) {
+            const team = d.predicted_winner === 'home' ? singleFixture.home_team : singleFixture.away_team
+            setOraclePick({ predicted_winner: d.predicted_winner, team })
+          } else {
+            setOraclePick(null)
+          }
+        })
+        .catch(() => setOraclePick(null))
     } else {
       setOddsData(null)
       setOddsMeta(null)
       setOddsError('')
+      setOraclePick(null)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [singleFixture?.id])
@@ -245,6 +258,32 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
                   : selectedFixtures.length > 1
                     ? `Get AI Tip — ${selectedFixtures.length} selected games`
                     : "Get AI Tip — today's games"}
+              </button>
+            </div>
+          )}
+
+          {/* Cherry's oracle pick */}
+          {singleFixture && oraclePick && (
+            <div className="oracle-pick-banner">
+              <span className="oracle-pick-icon">🐙</span>
+              <div className="oracle-pick-body">
+                <span className="oracle-pick-label">Cherry picks:</span>
+                <span className="oracle-pick-team">{oraclePick.team} to win</span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost oracle-pick-btn"
+                onClick={() => {
+                  const market: MarketType = oraclePick.predicted_winner === 'home' ? 'home_win' : 'away_win'
+                  setMarketType(market)
+                  // If odds are loaded for this market, apply them too
+                  if (oddsData) {
+                    const price = oraclePick.predicted_winner === 'home' ? oddsData.home_win : oddsData.away_win
+                    if (price) setOdds(price.toFixed(2))
+                  }
+                }}
+              >
+                Bet with Cherry
               </button>
             </div>
           )}
