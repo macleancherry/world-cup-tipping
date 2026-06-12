@@ -222,8 +222,8 @@ export default function MatchDaysPage() {
                       ) : detail ? (
                         <>
                           {/* Stats + Add Bet */}
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-                            <div className="grid-3 stats-strip" style={{ flex: 1, minWidth: 0, margin: 0 }}>
+                          <div style={{ marginBottom: '1rem' }}>
+                            <div className="grid-3 stats-strip" style={{ margin: 0, marginBottom: '0.75rem' }}>
                               <div className="stat-card">
                                 <div className="stat-label">Budget</div>
                                 <div className="stat-value">{formatCents(detail.budget_amount)}</div>
@@ -244,7 +244,7 @@ export default function MatchDaysPage() {
                             </div>
                             <button
                               className="btn btn-primary"
-                              style={{ flexShrink: 0, alignSelf: 'center' }}
+                              style={{ width: '100%' }}
                               onClick={() => setBettingDayId(day.id)}
                             >
                               + Add Bet
