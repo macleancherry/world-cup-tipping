@@ -13,18 +13,24 @@ interface Props {
   onCancel: () => void
 }
 
-const MARKETS: { value: MarketType; label: string }[] = [
-  { value: 'home_win', label: 'Home Win' },
-  { value: 'away_win', label: 'Away Win' },
-  { value: 'draw', label: 'Draw' },
-  { value: 'home_or_draw', label: 'Home or Draw' },
-  { value: 'away_or_draw', label: 'Away or Draw' },
-  { value: 'over_goals', label: 'Over Goals' },
-  { value: 'under_goals', label: 'Under Goals' },
-  { value: 'btts_yes', label: 'Both Teams to Score' },
-  { value: 'btts_no', label: 'Both Teams NOT to Score' },
-  { value: 'custom', label: 'Other / Custom' },
+const MARKETS: { value: MarketType; label: string; homeLabel?: string; awayLabel?: string }[] = [
+  { value: 'home_win',     label: 'Home Win',         homeLabel: '{home} Win' },
+  { value: 'away_win',     label: 'Away Win',         awayLabel: '{away} Win' },
+  { value: 'draw',         label: 'Draw' },
+  { value: 'home_or_draw', label: 'Home or Draw',     homeLabel: '{home} or Draw' },
+  { value: 'away_or_draw', label: 'Away or Draw',     awayLabel: '{away} or Draw' },
+  { value: 'over_goals',   label: 'Over Goals' },
+  { value: 'under_goals',  label: 'Under Goals' },
+  { value: 'btts_yes',     label: 'Both Teams to Score' },
+  { value: 'btts_no',      label: 'Both Teams NOT to Score' },
+  { value: 'custom',       label: 'Other / Custom' },
 ]
+
+function marketLabel(market: typeof MARKETS[number], homeTeam?: string, awayTeam?: string): string {
+  if (homeTeam && market.homeLabel) return market.homeLabel.replace('{home}', homeTeam)
+  if (awayTeam && market.awayLabel) return market.awayLabel.replace('{away}', awayTeam)
+  return market.label
+}
 
 export default function BetForm({ matchDayId, fixtures, participants, budget, staked = 0, onCreated, onCancel }: Props) {
   const [marketType, setMarketType] = useState<MarketType>('home_win')
@@ -49,16 +55,25 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
   const bettableFixtures = fixtures.filter(f => f.status === 'scheduled' || f.status === 'in_progress')
   const hiddenCount = fixtures.length - bettableFixtures.length
 
-  // Derive title automatically — no manual input
-  const autoTitle = selectedFixtures.length === 1
+  const singleFixture = selectedFixtures.length === 1
+    ? bettableFixtures.find(x => x.id === selectedFixtures[0])
+    : undefined
+
+  // Derive title automatically — uses team names for home/away markets
+  const autoTitle = singleFixture
     ? (() => {
-        const f = bettableFixtures.find(x => x.id === selectedFixtures[0])
-        const mkt = MARKETS.find(m => m.value === marketType)?.label ?? ''
-        return f ? `${f.home_team} vs ${f.away_team} — ${mkt}` : ''
+        const mkt = MARKETS.find(m => m.value === marketType)
+        const mktName = mkt ? marketLabel(mkt, singleFixture.home_team, singleFixture.away_team) : ''
+        return `${singleFixture.home_team} vs ${singleFixture.away_team} — ${mktName}`
       })()
     : selectedFixtures.length > 1
       ? `Multi (${selectedFixtures.length} games)`
       : ''
+
+  // Fixtures to analyse in AI tip: selected ones, or all bettable if none chosen
+  const aiFixtures = selectedFixtures.length > 0
+    ? bettableFixtures.filter(f => selectedFixtures.includes(f.id))
+    : bettableFixtures
 
   function toggleFixture(id: number) {
     setSelectedFixtures(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -107,8 +122,6 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
       setLoading(false)
     }
   }
-
-  const aiFixture = selectedFixtures.length === 1 ? bettableFixtures.find(x => x.id === selectedFixtures[0]) : undefined
 
   return (
     <>
@@ -162,8 +175,8 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
             )}
           </div>
 
-          {/* AI tip — single game only */}
-          {selectedFixtures.length === 1 && (
+          {/* AI tip — always available */}
+          {bettableFixtures.length > 0 && (
             <div style={{ marginBottom: '1rem' }}>
               <button
                 type="button"
@@ -171,7 +184,11 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
                 onClick={() => setShowAiTip(true)}
                 style={{ width: '100%' }}
               >
-                🤖 Get AI Tip for this match
+                🤖 {selectedFixtures.length === 1
+                  ? `Get AI Tip — ${singleFixture?.home_team} vs ${singleFixture?.away_team}`
+                  : selectedFixtures.length > 1
+                    ? `Get AI Tip — ${selectedFixtures.length} selected games`
+                    : "Get AI Tip — today's games"}
               </button>
             </div>
           )}
@@ -182,7 +199,11 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
               <div className="form-group">
                 <label className="form-label">Market</label>
                 <select className="form-select" value={marketType} onChange={e => setMarketType(e.target.value as MarketType)}>
-                  {MARKETS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  {MARKETS.map(m => (
+                    <option key={m.value} value={m.value}>
+                      {marketLabel(m, singleFixture?.home_team, singleFixture?.away_team)}
+                    </option>
+                  ))}
                 </select>
               </div>
               {(marketType === 'over_goals' || marketType === 'under_goals') && (
@@ -253,8 +274,8 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
           </div>
         </div>
       </div>
-      {showAiTip && aiFixture && (
-        <AiTipModal fixture={aiFixture} onClose={() => setShowAiTip(false)} />
+      {showAiTip && aiFixtures.length > 0 && (
+        <AiTipModal fixtures={aiFixtures} onClose={() => setShowAiTip(false)} />
       )}
     </>
   )
