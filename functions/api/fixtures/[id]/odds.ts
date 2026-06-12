@@ -105,7 +105,7 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
 
   const url = `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds` +
     `?apiKey=${ctx.env.ODDS_API_KEY}` +
-    `&regions=au&markets=h2h,totals,btts,double_chance&bookmakers=sportsbet` +
+    `&regions=au&markets=h2h,totals&bookmakers=sportsbet` +
     `&commenceTimeFrom=${from}&commenceTimeTo=${to}`;
 
   let events: OddsEvent[];
@@ -125,7 +125,8 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
           stale: true,
         });
       }
-      return json({ available: false, reason: `Odds API error ${res.status}: ${body}` });
+      const msg = (() => { try { return (JSON.parse(body) as { message?: string }).message ?? body } catch { return body } })()
+      return json({ available: false, reason: `Odds unavailable (${res.status}): ${msg}` });
     }
     events = await res.json() as OddsEvent[];
   } catch (e) {
