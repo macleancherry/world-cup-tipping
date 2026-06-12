@@ -113,7 +113,7 @@ export default function AiTipModal({ fixture, onClose }: Props) {
             className={`tab-btn ${mode === 'copy' ? 'active' : ''}`}
             onClick={() => setMode('copy')}
           >
-            📋 Copy for ChatGPT / Claude
+            💬 Ask ChatGPT / Claude
           </button>
         </div>
 
@@ -161,7 +161,7 @@ export default function AiTipModal({ fixture, onClose }: Props) {
         {mode === 'copy' && (
           <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
             <p className="text-muted" style={{ fontSize: '0.875rem', marginBottom: '0.75rem' }}>
-              Copy this prompt and paste it into ChatGPT, Claude, Gemini, or any AI you like.
+              Click a button to open ChatGPT or Claude with the prompt pre-loaded, or copy it for any other AI.
             </p>
             <textarea
               readOnly
@@ -181,25 +181,25 @@ export default function AiTipModal({ fixture, onClose }: Props) {
                 boxSizing: 'border-box',
               }}
             />
-            <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem' }}>
-              <button className="btn btn-primary" onClick={copyPrompt}>
-                {copied ? '✓ Copied!' : '📋 Copy to clipboard'}
+            <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button className="btn btn-ghost btn-sm" onClick={copyPrompt}>
+                {copied ? '✓ Copied!' : '📋 Copy'}
               </button>
               <a
-                href="https://chat.openai.com"
+                href={`https://chatgpt.com/?q=${encodeURIComponent(copyPromptText)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn btn-ghost"
+                className="btn btn-ghost btn-sm"
               >
-                Open ChatGPT ↗
+                Ask ChatGPT ↗
               </a>
               <a
-                href="https://claude.ai"
+                href={`https://claude.ai/new?q=${encodeURIComponent(copyPromptText)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn btn-ghost"
+                className="btn btn-ghost btn-sm"
               >
-                Open Claude ↗
+                Ask Claude ↗
               </a>
             </div>
           </div>
