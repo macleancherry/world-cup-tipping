@@ -73,7 +73,7 @@ export default function DashboardPage() {
 
   const { kitty, today_match_day: today, next_bettable_match_day_id, upcoming_fixtures, recent_fixtures, live_fixtures = [], pending_bets, needs_settlement } = data
   const addBetPath = next_bettable_match_day_id
-    ? `/match-days/${next_bettable_match_day_id}`
+    ? `/match-days?day=${next_bettable_match_day_id}`
     : '/match-days'
   const pnl = kitty.balance - kitty.starting_kitty
 

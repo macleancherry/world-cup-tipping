@@ -342,6 +342,8 @@ tr:hover td { background: var(--bg-elevated); }
 }
 .match-day-card:hover { border-color: var(--socceroos-green); background: var(--bg-elevated); }
 .match-day-card.today { border-color: var(--socceroos-green); box-shadow: 0 0 0 1px rgba(0, 106, 78, 0.1); }
+.match-day-card.expanded { border-color: var(--socceroos-green); background: var(--bg-surface); }
+.match-day-card.expanded:hover { background: var(--bg-surface); }
 .match-day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
 .match-day-date { font-weight: 700; font-size: 1rem; }
 .match-day-meta { display: flex; gap: 0.75rem; font-size: 0.8rem; color: var(--text-secondary); flex-wrap: wrap; margin-top: 0.25rem; }
