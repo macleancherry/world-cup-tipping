@@ -7,6 +7,9 @@ binding = "DB"
 database_name = "world-cup-tipping"
 database_id = "30d0fc84-c63b-4216-859b-3ae222c81cae"
 
+[ai]
+binding = "AI"
+
 [vars]
 TIMEZONE = "Australia/Perth"
 ALLOW_PUBLIC_READONLY = "false"

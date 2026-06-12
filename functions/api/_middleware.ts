@@ -2,6 +2,7 @@ import type { PagesFunction } from '@cloudflare/workers-types';
 
 export interface Env {
   DB: D1Database;
+  AI: Ai;
   SESSION_SECRET: string;
   ADMIN_PASSWORD_HASH: string;
   RESULTS_PROVIDER: string;

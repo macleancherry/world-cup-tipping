@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { Fixture, Participant, BetType, MarketType } from '../types'
 import { formatCents } from '../hooks/useApi'
+import AiTipModal from './AiTipModal'
 
 interface Props {
   matchDayId: number
@@ -34,6 +35,7 @@ export default function BetForm({ matchDayId, fixtures, participants, onCreated,
   const [selectedFixtures, setSelectedFixtures] = useState<number[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showAiTip, setShowAiTip] = useState(false)
 
   const stakeNum = parseFloat(stake) || 0
   const oddsNum = parseFloat(odds) || 0
@@ -113,7 +115,10 @@ export default function BetForm({ matchDayId, fixtures, participants, onCreated,
     }
   }
 
+  const aiFixture = selectedFixtures.length === 1 ? fixtures.find(x => x.id === selectedFixtures[0]) : undefined
+
   return (
+    <>
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal" style={{ maxWidth: '520px' }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
@@ -144,6 +149,20 @@ export default function BetForm({ matchDayId, fixtures, participants, onCreated,
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* AI tip button — only when exactly one fixture is selected */}
+        {selectedFixtures.length === 1 && (
+          <div style={{ marginBottom: '1rem' }}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setShowAiTip(true)}
+              style={{ width: '100%' }}
+            >
+              🤖 Get AI Tip for this match
+            </button>
           </div>
         )}
 
@@ -237,5 +256,9 @@ export default function BetForm({ matchDayId, fixtures, participants, onCreated,
         </div>
       </div>
     </div>
+    {showAiTip && aiFixture && (
+      <AiTipModal fixture={aiFixture} onClose={() => setShowAiTip(false)} />
+    )}
+    </>
   )
 }
