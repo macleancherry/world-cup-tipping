@@ -1,6 +1,9 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../../_middleware';
 
+const CACHE_TTL_MS   = 60 * 60 * 1000;  // 1 hour
+const MAX_FETCHES    = 5;                // per fixture, lifetime
+
 interface OddsEvent {
   id: string;
   home_team: string;
@@ -13,6 +16,13 @@ interface OddsEvent {
       outcomes: Array<{ name: string; price: number; point?: number }>;
     }>;
   }>;
+}
+
+interface CacheRow {
+  fixture_id: number;
+  odds_json: string;
+  fetch_count: number;
+  fetched_at: string;
 }
 
 // Normalise team names for fuzzy matching across data sources
@@ -43,18 +53,51 @@ function teamsMatch(a: string, b: string): boolean {
 }
 
 export const onRequestGet: PagesFunction<Env> = async (ctx) => {
+  const db = ctx.env.DB;
+
+  // Ensure cache table exists (self-initialising, no manual migration needed)
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS odds_cache (
+      fixture_id  INTEGER PRIMARY KEY,
+      odds_json   TEXT    NOT NULL,
+      fetch_count INTEGER NOT NULL DEFAULT 0,
+      fetched_at  TEXT    NOT NULL
+    )
+  `).run();
+
   if (!ctx.env.ODDS_API_KEY) {
     return json({ available: false, reason: 'ODDS_API_KEY not configured' });
   }
 
   const id = ctx.params.id as string;
-  const fixture = await ctx.env.DB.prepare(
+  const fixture = await db.prepare(
     'SELECT id, home_team, away_team, kickoff_utc FROM fixtures WHERE id = ?'
   ).bind(id).first<{ id: number; home_team: string; away_team: string; kickoff_utc: string }>();
 
   if (!fixture) return json({ available: false, reason: 'Fixture not found' }, 404);
 
-  // Fetch odds in a ±3h window around kickoff to limit credits used
+  // Check cache
+  const cached = await db.prepare('SELECT * FROM odds_cache WHERE fixture_id = ?')
+    .bind(fixture.id).first<CacheRow>();
+
+  const now = Date.now();
+  const ageMs = cached ? now - new Date(cached.fetched_at).getTime() : Infinity;
+  const isFresh = ageMs < CACHE_TTL_MS;
+  const maxReached = cached != null && cached.fetch_count >= MAX_FETCHES;
+
+  // Return cache if still fresh, or if we've hit the fetch cap
+  if (cached && (isFresh || maxReached)) {
+    return json({
+      ...JSON.parse(cached.odds_json),
+      fetch_count: cached.fetch_count,
+      max_fetches: MAX_FETCHES,
+      max_reached: maxReached,
+      fetched_at: cached.fetched_at,
+      from_cache: true,
+    });
+  }
+
+  // --- Live fetch ---
   const kickoff = new Date(fixture.kickoff_utc);
   const from = new Date(kickoff.getTime() - 3 * 60 * 60 * 1000).toISOString();
   const to   = new Date(kickoff.getTime() + 3 * 60 * 60 * 1000).toISOString();
@@ -69,40 +112,81 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     const res = await fetch(url);
     if (!res.ok) {
       const body = await res.text();
+      // If we have a stale cache, better to return it than an error
+      if (cached) {
+        return json({
+          ...JSON.parse(cached.odds_json),
+          fetch_count: cached.fetch_count,
+          max_fetches: MAX_FETCHES,
+          max_reached: maxReached,
+          fetched_at: cached.fetched_at,
+          from_cache: true,
+          stale: true,
+        });
+      }
       return json({ available: false, reason: `Odds API error ${res.status}: ${body}` });
     }
     events = await res.json() as OddsEvent[];
   } catch (e) {
+    if (cached) {
+      return json({
+        ...JSON.parse(cached.odds_json),
+        fetch_count: cached.fetch_count,
+        max_fetches: MAX_FETCHES,
+        fetched_at: cached.fetched_at,
+        from_cache: true,
+        stale: true,
+      });
+    }
     return json({ available: false, reason: `Network error: ${(e as Error).message}` });
   }
 
-  // Find the matching event
   const event = events.find(e =>
     (teamsMatch(e.home_team, fixture.home_team) && teamsMatch(e.away_team, fixture.away_team)) ||
     (teamsMatch(e.home_team, fixture.away_team) && teamsMatch(e.away_team, fixture.home_team))
   );
 
   if (!event) {
+    if (cached) {
+      return json({
+        ...JSON.parse(cached.odds_json),
+        fetch_count: cached.fetch_count,
+        max_fetches: MAX_FETCHES,
+        fetched_at: cached.fetched_at,
+        from_cache: true,
+        stale: true,
+      });
+    }
     return json({ available: false, reason: 'No Sportsbet odds found for this fixture yet' });
   }
 
   const sb = event.bookmakers.find(b => b.key === 'sportsbet');
-  if (!sb) return json({ available: false, reason: 'Sportsbet not offering this game yet' });
+  if (!sb) {
+    if (cached) {
+      return json({
+        ...JSON.parse(cached.odds_json),
+        fetch_count: cached.fetch_count,
+        max_fetches: MAX_FETCHES,
+        fetched_at: cached.fetched_at,
+        from_cache: true,
+        stale: true,
+      });
+    }
+    return json({ available: false, reason: 'Sportsbet not offering this game yet' });
+  }
 
-  // Determine if teams are flipped (The Odds API may list home/away differently)
   const flipped = teamsMatch(event.home_team, fixture.away_team);
-
-  const result: Record<string, number | string | boolean> = { available: true };
+  const oddsPayload: Record<string, number | boolean> = { available: true };
 
   const h2h = sb.markets.find(m => m.key === 'h2h');
   if (h2h) {
     for (const o of h2h.outcomes) {
       if (teamsMatch(o.name, 'draw')) {
-        result.draw = o.price;
+        oddsPayload.draw = o.price;
       } else if (teamsMatch(o.name, event.home_team)) {
-        result[flipped ? 'away_win' : 'home_win'] = o.price;
+        oddsPayload[flipped ? 'away_win' : 'home_win'] = o.price;
       } else if (teamsMatch(o.name, event.away_team)) {
-        result[flipped ? 'home_win' : 'away_win'] = o.price;
+        oddsPayload[flipped ? 'home_win' : 'away_win'] = o.price;
       }
     }
   }
@@ -111,11 +195,30 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   if (totals) {
     const over  = totals.outcomes.find(o => o.name === 'Over');
     const under = totals.outcomes.find(o => o.name === 'Under');
-    if (over)  { result.over_goals  = over.price;  result.goals_line = over.point ?? 2.5; }
-    if (under) { result.under_goals = under.price; }
+    if (over)  { oddsPayload.over_goals  = over.price;  oddsPayload.goals_line = over.point ?? 2.5; }
+    if (under) { oddsPayload.under_goals = under.price; }
   }
 
-  return json(result);
+  // Upsert cache
+  const newCount = (cached?.fetch_count ?? 0) + 1;
+  const fetchedAt = new Date().toISOString();
+  await db.prepare(`
+    INSERT INTO odds_cache (fixture_id, odds_json, fetch_count, fetched_at)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT (fixture_id) DO UPDATE SET
+      odds_json = excluded.odds_json,
+      fetch_count = excluded.fetch_count,
+      fetched_at = excluded.fetched_at
+  `).bind(fixture.id, JSON.stringify(oddsPayload), newCount, fetchedAt).run();
+
+  return json({
+    ...oddsPayload,
+    fetch_count: newCount,
+    max_fetches: MAX_FETCHES,
+    max_reached: newCount >= MAX_FETCHES,
+    fetched_at: fetchedAt,
+    from_cache: false,
+  });
 };
 
 function json(d: unknown, s = 200) {
