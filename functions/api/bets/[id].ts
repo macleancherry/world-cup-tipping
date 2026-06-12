@@ -9,6 +9,7 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
 };
 
 export const onRequestPut: PagesFunction<Env> = async (ctx) => {
+  try { await ctx.env.DB.prepare('ALTER TABLE bets ADD COLUMN placed INTEGER NOT NULL DEFAULT 0').run() } catch {}
   const bet = await ctx.env.DB.prepare('SELECT * FROM bets WHERE id = ?').bind(ctx.params.id).first() as Record<string, unknown> | null;
   if (!bet) return json({ error: 'Not found' }, 404);
   if (bet.settlement_status !== 'pending') return json({ error: 'Cannot edit settled bet' }, 400);
