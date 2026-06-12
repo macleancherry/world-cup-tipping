@@ -49,15 +49,25 @@ export default function DashboardPage() {
     loadData().finally(() => setLoading(false))
   }, [loadData])
 
-  // Auto-refresh every 60s while live games are on
+  // Auto-sync every 60s when games are live OR kicking off within 3 hours.
+  // Must call the sync endpoint (not just re-read DB) so scores actually update.
+  const hasLive = (data?.live_fixtures?.length ?? 0) > 0
+  const hasImminent = (data?.upcoming_fixtures ?? []).some(
+    f => new Date(f.kickoff_utc).getTime() - Date.now() < 3 * 60 * 60 * 1000
+  )
+  const shouldAutoSync = hasLive || hasImminent
+
   useEffect(() => {
-    const hasLive = (data?.live_fixtures?.length ?? 0) > 0
     if (refreshTimerRef.current) clearInterval(refreshTimerRef.current)
-    if (hasLive) {
-      refreshTimerRef.current = setInterval(loadData, 60_000)
-    }
+    if (!shouldAutoSync) return
+    refreshTimerRef.current = setInterval(async () => {
+      try {
+        await fetch('/api/results/sync', { method: 'POST' })
+      } catch { /* ignore sync errors — stale data is fine */ }
+      await loadData()
+    }, 60_000)
     return () => { if (refreshTimerRef.current) clearInterval(refreshTimerRef.current) }
-  }, [(data?.live_fixtures?.length ?? 0) > 0])  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [shouldAutoSync, loadData])
 
   async function syncScores() {
     setSyncing(true)
@@ -162,7 +172,7 @@ export default function DashboardPage() {
             )
           })}
           <p className="text-xs text-muted" style={{ marginTop: '0.4rem' }}>
-            Dashboard refreshes automatically every minute while games are live.
+            Scores sync automatically every minute.
           </p>
         </div>
       )}
