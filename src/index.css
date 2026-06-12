@@ -642,6 +642,15 @@ tr:hover td { background: var(--bg-elevated); }
   .matchday-fixtures { order: -1; }
   .matchday-stats { order: 0; }
   .matchday-bets { order: 1; }
+
+  /* Compact fixture rows so they fit on narrow screens */
+  .match-day-card { padding: 0.875rem 0.875rem; }
+  .fixture-row { gap: 0.4rem; padding: 0.6rem 0.5rem; }
+  .fixture-time { min-width: 36px; font-size: 0.68rem; }
+  .fixture-score { min-width: 42px; font-size: 0.95rem; }
+  .fixture-team { font-size: 0.8rem; }
+  .fixture-row .badge { font-size: 0.6rem; padding: 0.1rem 0.3rem; letter-spacing: 0; }
+  .fixture-meta { font-size: 0.62rem; }
 }
 
 /* Misc utils */
