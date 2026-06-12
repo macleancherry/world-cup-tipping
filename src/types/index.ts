@@ -25,6 +25,8 @@ export interface Fixture {
   home_score: number | null;
   away_score: number | null;
   winner: 'home' | 'away' | 'draw' | 'unknown' | null;
+  current_minute: number | null;
+  injury_time: number | null;
   last_synced_at: string | null;
   created_at: string;
   updated_at: string;

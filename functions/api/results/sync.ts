@@ -8,6 +8,13 @@ interface ProviderFixture {
   homeScore: number | null;
   awayScore: number | null;
   winner: string;
+  currentMinute: number | null;
+  injuryTime: number | null;
+}
+
+async function ensureMinuteColumns(db: D1Database) {
+  try { await db.prepare('ALTER TABLE fixtures ADD COLUMN current_minute INTEGER').run(); } catch { /* already exists */ }
+  try { await db.prepare('ALTER TABLE fixtures ADD COLUMN injury_time INTEGER').run(); } catch { /* already exists */ }
 }
 
 async function fetchFromProvider(env: Env): Promise<{ fixtures: ProviderFixture[]; debug: string }> {
@@ -27,6 +34,8 @@ async function fetchFromProvider(env: Env): Promise<{ fixtures: ProviderFixture[
       id: number;
       utcDate: string;
       status: string;
+      minute?: number | null;
+      injuryTime?: number | null;
       score: {
         winner: string | null;
         fullTime: { home: number | null; away: number | null };
@@ -42,6 +51,8 @@ async function fetchFromProvider(env: Env): Promise<{ fixtures: ProviderFixture[
     POSTPONED: 'postponed', CANCELLED: 'cancelled', SUSPENDED: 'cancelled',
   };
 
+  const liveStatuses = new Set(['IN_PLAY', 'LIVE', 'PAUSED']);
+
   return {
     debug,
     fixtures: (data.matches ?? []).map(m => ({
@@ -54,6 +65,8 @@ async function fetchFromProvider(env: Env): Promise<{ fixtures: ProviderFixture[
             : m.score.winner === 'AWAY_TEAM' ? 'away'
             : m.score.winner === 'DRAW' ? 'draw'
             : 'unknown',
+      currentMinute: liveStatuses.has(m.status) ? (m.minute ?? null) : null,
+      injuryTime: liveStatuses.has(m.status) ? (m.injuryTime ?? null) : null,
     })),
   };
 }
@@ -84,6 +97,7 @@ function canAutoSettle(bet: Record<string, unknown>, fixture: Record<string, unk
 
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   const db = ctx.env.DB;
+  await ensureMinuteColumns(db);
   let fixturesUpdated = 0;
   let fixturesNotMatched = 0;
   let betsAutoSettled = 0;
@@ -119,7 +133,9 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
         existing.home_score !== pf.homeScore ||
         existing.away_score !== pf.awayScore ||
         existing.winner !== pf.winner ||
-        existing.external_provider_id !== pf.externalProviderId;
+        existing.external_provider_id !== pf.externalProviderId ||
+        (existing as Record<string, unknown>).current_minute !== pf.currentMinute ||
+        (existing as Record<string, unknown>).injury_time !== pf.injuryTime;
 
       if (!changed) continue;
 
@@ -127,9 +143,11 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
         UPDATE fixtures
         SET status = ?, home_score = ?, away_score = ?, winner = ?,
             external_provider_id = ?,
+            current_minute = ?, injury_time = ?,
             last_synced_at = datetime('now'), updated_at = datetime('now')
         WHERE id = ?
-      `).bind(pf.status, pf.homeScore, pf.awayScore, pf.winner, pf.externalProviderId, existing.id).run();
+      `).bind(pf.status, pf.homeScore, pf.awayScore, pf.winner, pf.externalProviderId,
+              pf.currentMinute, pf.injuryTime, existing.id).run();
       fixturesUpdated++;
     } catch (e) {
       errors.push(`Fixture ${pf.externalProviderId}: ${(e as Error).message}`);

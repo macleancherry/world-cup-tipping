@@ -112,6 +112,9 @@ export default function DashboardPage() {
             const scoreStr = f.home_score != null && f.away_score != null
               ? `${f.home_score} – ${f.away_score}`
               : 'vs'
+            const minuteStr = f.current_minute != null
+              ? (f.injury_time ? `${f.current_minute}+${f.injury_time}'` : `${f.current_minute}'`)
+              : null
             const hasBets = f.pending_bets.length > 0
 
             return (
@@ -122,7 +125,7 @@ export default function DashboardPage() {
                     <span className="live-score">{scoreStr}</span>
                     <span className="live-team">{f.away_team}</span>
                   </div>
-                  <span className="badge badge-live">🔴 LIVE</span>
+                  <span className="badge badge-live">🔴 {minuteStr ?? 'LIVE'}</span>
                 </div>
 
                 {hasBets && (
