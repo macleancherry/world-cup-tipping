@@ -7,6 +7,8 @@ interface Props {
   matchDayId: number
   fixtures: Fixture[]
   participants: Participant[]
+  budget?: number
+  staked?: number
   onCreated: () => void
   onCancel: () => void
 }
@@ -24,7 +26,7 @@ const MARKETS: { value: MarketType; label: string }[] = [
   { value: 'custom', label: 'Other / Custom' },
 ]
 
-export default function BetForm({ matchDayId, fixtures, participants, onCreated, onCancel }: Props) {
+export default function BetForm({ matchDayId, fixtures, participants, budget, staked = 0, onCreated, onCancel }: Props) {
   const [title, setTitle] = useState('')
   const [titleTouched, setTitleTouched] = useState(false)
   const [marketType, setMarketType] = useState<MarketType>('home_win')
@@ -41,6 +43,14 @@ export default function BetForm({ matchDayId, fixtures, participants, onCreated,
   const oddsNum = parseFloat(odds) || 0
   const potentialReturn = stakeNum > 0 && oddsNum >= 1.01 ? stakeNum * oddsNum : 0
   const potentialProfit = potentialReturn - stakeNum
+
+  const remaining = budget != null ? budget - staked : null
+  const overBudget = remaining != null && stakeNum * 100 > remaining
+  const nearBudget = remaining != null && stakeNum * 100 > remaining * 0.8
+
+  // Only show fixtures that can still be bet on
+  const bettableFixtures = fixtures.filter(f => f.status === 'scheduled' || f.status === 'in_progress')
+  const hasFinishedFixtures = fixtures.some(f => f.status === 'finished' || f.status === 'cancelled' || f.status === 'postponed')
 
   const isCustom = selectedFixtures.length === 0
 
@@ -128,12 +138,28 @@ export default function BetForm({ matchDayId, fixtures, participants, onCreated,
 
         {error && <div className="alert alert-error">{error}</div>}
 
+        {/* Budget remaining */}
+        {remaining != null && (
+          <div className={`alert ${overBudget ? 'alert-error' : nearBudget ? 'alert-warn' : 'alert-info'}`} style={{ marginBottom: '1rem' }}>
+            {overBudget
+              ? `Over budget — only ${formatCents(remaining)} remaining of ${formatCents(budget!)}`
+              : `${formatCents(remaining)} remaining of ${formatCents(budget!)} daily budget`}
+          </div>
+        )}
+
         {/* Fixture picker */}
-        {fixtures.length > 0 && (
+        {(bettableFixtures.length > 0 || hasFinishedFixtures) && (
           <div className="form-group">
-            <label className="form-label">Game (optional — skip for outrights &amp; multis)</label>
+            <label className="form-label">
+              Game (optional — skip for outrights &amp; multis)
+              {hasFinishedFixtures && bettableFixtures.length < fixtures.length && (
+                <span className="text-muted" style={{ fontWeight: 400, marginLeft: '0.4rem', fontSize: '0.75rem' }}>
+                  · {fixtures.length - bettableFixtures.length} finished game{fixtures.length - bettableFixtures.length !== 1 ? 's' : ''} hidden
+                </span>
+              )}
+            </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              {fixtures.map(f => (
+              {bettableFixtures.map(f => (
                 <button
                   key={f.id}
                   type="button"
@@ -250,7 +276,7 @@ export default function BetForm({ matchDayId, fixtures, participants, onCreated,
 
         <div className="modal-footer">
           <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
-          <button className="btn btn-primary" onClick={submit} disabled={loading}>
+          <button className="btn btn-primary" onClick={submit} disabled={loading || overBudget}>
             {loading ? 'Saving...' : 'Add Bet'}
           </button>
         </div>

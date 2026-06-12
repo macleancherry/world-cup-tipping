@@ -44,6 +44,41 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   if (!body.stake_amount || body.stake_amount <= 0) return json({ error: 'stake_amount must be > 0' }, 400);
   if (!body.odds_decimal || body.odds_decimal < 1.01) return json({ error: 'odds_decimal must be >= 1.01' }, 400);
 
+  // Reject bets on finished/cancelled/postponed fixtures
+  if (body.fixture_ids?.length) {
+    const placeholders = body.fixture_ids.map(() => '?').join(',');
+    const badFixtures = await ctx.env.DB.prepare(
+      `SELECT id FROM fixtures WHERE id IN (${placeholders}) AND status IN ('finished','cancelled','postponed')`
+    ).bind(...body.fixture_ids).all<{ id: number }>();
+    if (badFixtures.results.length > 0) {
+      return json({ error: 'One or more selected fixtures have already finished or been cancelled.' }, 422);
+    }
+  }
+
+  // Budget check — sum non-void stakes for this match day
+  const budgetRow = await ctx.env.DB.prepare(`
+    SELECT md.budget_amount,
+      COALESCE((
+        SELECT SUM(ABS(kt.amount))
+        FROM kitty_transactions kt
+        JOIN bets b2 ON kt.bet_id = b2.id
+        WHERE b2.match_day_id = md.id
+          AND kt.type = 'stake_placed'
+          AND b2.settlement_status != 'void'
+      ), 0) AS total_staked
+    FROM match_days md WHERE md.id = ?
+  `).bind(body.match_day_id).first<{ budget_amount: number; total_staked: number }>();
+
+  if (budgetRow) {
+    const remaining = budgetRow.budget_amount - budgetRow.total_staked;
+    if (body.stake_amount > remaining) {
+      const fmt = (c: number) => `$${(c / 100).toFixed(2)}`;
+      return json({
+        error: `Stake of ${fmt(body.stake_amount)} exceeds the remaining daily budget of ${fmt(remaining)} (limit ${fmt(budgetRow.budget_amount)}).`,
+      }, 422);
+    }
+  }
+
   const potential_return = Math.round(body.stake_amount * body.odds_decimal);
   const potential_profit = potential_return - body.stake_amount;
 

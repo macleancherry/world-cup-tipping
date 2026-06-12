@@ -146,6 +146,8 @@ export default function MatchDayDetailPage() {
           matchDayId={day.id}
           fixtures={day.fixtures}
           participants={participants}
+          budget={day.budget_amount}
+          staked={totalStaked}
           onCreated={() => { setShowBetForm(false); load() }}
           onCancel={() => setShowBetForm(false)}
         />
