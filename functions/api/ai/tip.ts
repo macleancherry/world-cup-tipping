@@ -132,6 +132,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
         { role: 'user', content: prompt },
       ],
       stream: true,
+      max_tokens: 2048,
     } as AiTextGenerationInput);
 
     return new Response(stream as ReadableStream, {
