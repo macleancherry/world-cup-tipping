@@ -266,6 +266,7 @@ body {
 .badge-cashed-out { background: rgba(168, 85, 247, 0.2); color: var(--accent-purple); }
 .badge-scheduled { background: rgba(0, 106, 78, 0.1); color: var(--socceroos-green); }
 .badge-in-progress { background: rgba(22, 163, 74, 0.12); color: #15803d; }
+.badge-live { background: rgba(220, 38, 38, 0.12); color: #dc2626; font-weight: 600; }
 .badge-finished { background: rgba(0,0,0,0.07); color: var(--text-secondary); }
 .badge-upcoming { background: rgba(0, 106, 78, 0.08); color: var(--socceroos-green); }
 .badge-complete { background: rgba(22, 163, 74, 0.1); color: #15803d; }
@@ -649,3 +650,73 @@ tr:hover td { background: var(--bg-elevated); }
 .font-bold { font-weight: 700; } .font-semibold { font-weight: 600; }
 .text-sm { font-size: 0.875rem; } .text-xs { font-size: 0.75rem; } .text-lg { font-size: 1.125rem; } .text-xl { font-size: 1.25rem; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Live games section */
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+.live-pulse-dot {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #dc2626;
+  animation: live-pulse 1.4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.live-fixture-card {
+  border-left: 3px solid #dc2626;
+  margin-bottom: 0.75rem;
+}
+.live-fixture-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+.live-fixture-teams {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex: 1;
+}
+.live-team {
+  font-weight: 600;
+  font-size: 0.95rem;
+  flex: 1;
+}
+.live-team:last-child { text-align: right; }
+.live-score {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.5rem;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  min-width: 3.5rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+.live-bets {
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+  margin-top: 0.25rem;
+}
+.live-bets-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.35rem;
+}
+.live-bet-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  padding: 0.2rem 0;
+}
+.live-bet-title { font-weight: 500; }
+.live-bet-meta { font-size: 0.78rem; white-space: nowrap; }

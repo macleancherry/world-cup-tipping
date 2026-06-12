@@ -56,7 +56,10 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
   const overBudget = remaining != null && stakeNum * 100 > remaining
   const nearBudget = remaining != null && !overBudget && stakeNum * 100 > remaining * 0.8
 
-  const bettableFixtures = fixtures.filter(f => f.status === 'scheduled')
+  const now = new Date()
+  const bettableFixtures = fixtures.filter(f =>
+    f.status === 'scheduled' && new Date(f.kickoff_utc) > now
+  )
   const hiddenCount = fixtures.length - bettableFixtures.length
 
   const singleFixture = selectedFixtures.length === 1

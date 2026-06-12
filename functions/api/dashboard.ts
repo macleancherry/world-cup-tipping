@@ -53,6 +53,21 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   const todayStaked = todayStakedRow?.total ?? 0;
   const todayBudget = (todayMD as Record<string, unknown> | null)?.budget_amount ?? 500;
 
+  // Live (in-progress) fixtures with any pending bets attached
+  const liveFixtures = await db.prepare(
+    "SELECT * FROM fixtures WHERE status = 'in_progress' ORDER BY kickoff_utc"
+  ).all<Record<string, unknown>>();
+
+  const liveWithBets: Record<string, unknown>[] = [];
+  for (const f of liveFixtures.results) {
+    const betsResult = await db.prepare(`
+      SELECT DISTINCT b.* FROM bets b
+      JOIN bet_fixture_links bfl ON bfl.bet_id = b.id
+      WHERE bfl.fixture_id = ? AND b.settlement_status = 'pending'
+    `).bind(f.id).all<Record<string, unknown>>();
+    liveWithBets.push({ ...f, pending_bets: betsResult.results });
+  }
+
   return new Response(JSON.stringify({
     kitty: {
       balance,
@@ -66,6 +81,7 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     today_match_day: todayMD ? { ...todayMD, today_staked: todayStaked, today_budget: todayBudget } : null,
     upcoming_fixtures: upcomingFixtures.results,
     recent_fixtures: recentFixtures.results,
+    live_fixtures: liveWithBets,
     pending_bets: pendingBets.results,
     needs_settlement: needsSettlement.results,
   }), { headers: { 'Content-Type': 'application/json' } });

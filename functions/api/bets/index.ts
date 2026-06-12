@@ -44,14 +44,15 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   if (!body.stake_amount || body.stake_amount <= 0) return json({ error: 'stake_amount must be > 0' }, 400);
   if (!body.odds_decimal || body.odds_decimal < 1.01) return json({ error: 'odds_decimal must be >= 1.01' }, 400);
 
-  // Reject bets on finished/cancelled/postponed fixtures
+  // Reject bets on games that have started or are no longer available
   if (body.fixture_ids?.length) {
     const placeholders = body.fixture_ids.map(() => '?').join(',');
     const badFixtures = await ctx.env.DB.prepare(
-      `SELECT id FROM fixtures WHERE id IN (${placeholders}) AND status IN ('finished','cancelled','postponed')`
+      `SELECT id FROM fixtures WHERE id IN (${placeholders})
+        AND (status IN ('finished','cancelled','postponed','in_progress') OR kickoff_utc <= datetime('now'))`
     ).bind(...body.fixture_ids).all<{ id: number }>();
     if (badFixtures.results.length > 0) {
-      return json({ error: 'One or more selected fixtures have already finished or been cancelled.' }, 422);
+      return json({ error: 'One or more selected games have already started or are no longer available for betting.' }, 422);
     }
   }
 

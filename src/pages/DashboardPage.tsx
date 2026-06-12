@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { formatCents, formatDate, formatKickoff } from '../hooks/useApi'
 import type { Bet, Fixture } from '../types'
+import AiCashoutModal from '../components/AiCashoutModal'
+
+type LiveFixture = Fixture & { pending_bets: Bet[] }
 
 interface DashboardData {
   kitty: {
@@ -23,6 +26,7 @@ interface DashboardData {
   } | null
   upcoming_fixtures: Fixture[]
   recent_fixtures: Fixture[]
+  live_fixtures: LiveFixture[]
   pending_bets: (Bet & { participant_name?: string })[]
   needs_settlement: Bet[]
 }
@@ -30,18 +34,44 @@ interface DashboardData {
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
+  const [cashoutFixture, setCashoutFixture] = useState<LiveFixture | null>(null)
+  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const loadData = useCallback(() => {
+    return fetch('/api/dashboard')
+      .then(r => r.json())
+      .then(d => setData(d as DashboardData))
+  }, [])
 
   useEffect(() => {
-    fetch('/api/dashboard')
-      .then(r => r.json())
-      .then(d => { setData(d as DashboardData); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [])
+    loadData().finally(() => setLoading(false))
+  }, [loadData])
+
+  // Auto-refresh every 60s while live games are on
+  useEffect(() => {
+    const hasLive = (data?.live_fixtures?.length ?? 0) > 0
+    if (refreshTimerRef.current) clearInterval(refreshTimerRef.current)
+    if (hasLive) {
+      refreshTimerRef.current = setInterval(loadData, 60_000)
+    }
+    return () => { if (refreshTimerRef.current) clearInterval(refreshTimerRef.current) }
+  }, [(data?.live_fixtures?.length ?? 0) > 0])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function syncScores() {
+    setSyncing(true)
+    try {
+      await fetch('/api/results/sync', { method: 'POST' })
+      await loadData()
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   if (loading) return <div className="loading-screen"><div className="spinner" /></div>
   if (!data) return <div className="alert alert-error">Failed to load dashboard</div>
 
-  const { kitty, today_match_day: today, upcoming_fixtures, recent_fixtures, pending_bets, needs_settlement } = data
+  const { kitty, today_match_day: today, upcoming_fixtures, recent_fixtures, live_fixtures = [], pending_bets, needs_settlement } = data
   const pnl = kitty.balance - kitty.starting_kitty
 
   return (
@@ -58,6 +88,83 @@ export default function DashboardPage() {
           + Add Bet
         </Link>
       </div>
+
+      {/* Live games section — shown at top when games are in progress */}
+      {live_fixtures.length > 0 && (
+        <div className="section mb-4">
+          <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span className="live-pulse-dot" />
+            <span>Live Now</span>
+            <span className="badge badge-live">{live_fixtures.length}</span>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
+              <button
+                className="btn btn-sm btn-ghost"
+                onClick={syncScores}
+                disabled={syncing}
+                title="Sync latest scores from football-data.org"
+              >
+                {syncing ? 'Syncing…' : '↺ Sync scores'}
+              </button>
+            </div>
+          </div>
+
+          {live_fixtures.map(f => {
+            const scoreStr = f.home_score != null && f.away_score != null
+              ? `${f.home_score} – ${f.away_score}`
+              : 'vs'
+            const hasBets = f.pending_bets.length > 0
+
+            return (
+              <div key={f.id} className="card live-fixture-card">
+                <div className="live-fixture-header">
+                  <div className="live-fixture-teams">
+                    <span className="live-team">{f.home_team}</span>
+                    <span className="live-score">{scoreStr}</span>
+                    <span className="live-team">{f.away_team}</span>
+                  </div>
+                  <span className="badge badge-live">🔴 LIVE</span>
+                </div>
+
+                {hasBets && (
+                  <div className="live-bets">
+                    <div className="live-bets-label">Pending bets on this game</div>
+                    {f.pending_bets.map(b => (
+                      <div key={b.id} className="live-bet-row">
+                        <span className="live-bet-title">{b.title}</span>
+                        <span className="live-bet-meta text-muted">
+                          {formatCents(b.stake_amount)} @ {b.odds_decimal.toFixed(2)} → {formatCents(b.potential_return)}
+                        </span>
+                      </div>
+                    ))}
+                    <div style={{ marginTop: '0.6rem' }}>
+                      <button
+                        className="btn btn-sm btn-ghost"
+                        onClick={() => setCashoutFixture(f)}
+                      >
+                        🤖 Cash Out Advice
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {!hasBets && (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    <button
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => setCashoutFixture(f)}
+                    >
+                      🤖 AI Game Analysis
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          <p className="text-xs text-muted" style={{ marginTop: '0.4rem' }}>
+            Dashboard refreshes automatically every minute while games are live.
+          </p>
+        </div>
+      )}
 
       {/* Kitty hero */}
       <div className="kitty-hero">
@@ -96,14 +203,14 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid-2 dashboard-today-grid">
-        {/* Tonight's games */}
+        {/* Upcoming games */}
         <div className="card dashboard-fixtures-card">
           <div className="card-header">
             <span className="card-title">Upcoming Games</span>
             <span className="badge badge-scheduled">{upcoming_fixtures.length}</span>
           </div>
           {upcoming_fixtures.length === 0 ? (
-            <div className="empty-state"><p>No upcoming games in the next 24 hours</p></div>
+            <div className="empty-state"><p>No upcoming games in the next 36 hours</p></div>
           ) : (
             upcoming_fixtures.map(f => (
               <div key={f.id} className="fixture-row" style={{ marginBottom: '0.5rem' }}>
@@ -147,14 +254,14 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* This morning's results */}
+        {/* Recent results */}
         <div className="card dashboard-matchday-card">
           <div className="card-header">
             <span className="card-title">Recent Results</span>
             <span className="badge badge-scheduled">{recent_fixtures.length}</span>
           </div>
           {recent_fixtures.length === 0 ? (
-            <div className="empty-state"><p>No games in the last 24 hours</p></div>
+            <div className="empty-state"><p>No games in the last 48 hours</p></div>
           ) : (
             recent_fixtures.map(f => (
               <div key={f.id} className="fixture-row" style={{ marginBottom: '0.5rem' }}>
@@ -219,6 +326,14 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {cashoutFixture && (
+        <AiCashoutModal
+          fixture={cashoutFixture}
+          bets={cashoutFixture.pending_bets}
+          onClose={() => setCashoutFixture(null)}
+        />
       )}
     </div>
   )
