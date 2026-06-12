@@ -318,6 +318,30 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
                         Under {oddsData.goals_line ?? 2.5} <strong>{oddsData.under_goals.toFixed(2)}</strong>
                       </button>
                     )}
+                    {oddsData.btts_yes != null && (
+                      <button type="button" className={`odds-chip ${marketType === 'btts_yes' ? 'selected' : ''}`}
+                        onClick={() => applyOdds('btts_yes', oddsData.btts_yes)}>
+                        BTTS Yes <strong>{oddsData.btts_yes.toFixed(2)}</strong>
+                      </button>
+                    )}
+                    {oddsData.btts_no != null && (
+                      <button type="button" className={`odds-chip ${marketType === 'btts_no' ? 'selected' : ''}`}
+                        onClick={() => applyOdds('btts_no', oddsData.btts_no)}>
+                        BTTS No <strong>{oddsData.btts_no.toFixed(2)}</strong>
+                      </button>
+                    )}
+                    {oddsData.home_or_draw != null && (
+                      <button type="button" className={`odds-chip ${marketType === 'home_or_draw' ? 'selected' : ''}`}
+                        onClick={() => applyOdds('home_or_draw', oddsData.home_or_draw)}>
+                        {singleFixture.home_team} or Draw <strong>{oddsData.home_or_draw.toFixed(2)}</strong>
+                      </button>
+                    )}
+                    {oddsData.away_or_draw != null && (
+                      <button type="button" className={`odds-chip ${marketType === 'away_or_draw' ? 'selected' : ''}`}
+                        onClick={() => applyOdds('away_or_draw', oddsData.away_or_draw)}>
+                        {singleFixture.away_team} or Draw <strong>{oddsData.away_or_draw.toFixed(2)}</strong>
+                      </button>
+                    )}
                   </div>
                   {oddsMeta && (
                     <p className="text-xs text-muted" style={{ marginTop: '0.35rem' }}>

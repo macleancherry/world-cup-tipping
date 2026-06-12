@@ -105,7 +105,7 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
 
   const url = `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds` +
     `?apiKey=${ctx.env.ODDS_API_KEY}` +
-    `&regions=au&markets=h2h,totals&bookmakers=sportsbet` +
+    `&regions=au&markets=h2h,totals,btts,double_chance&bookmakers=sportsbet` +
     `&commenceTimeFrom=${from}&commenceTimeTo=${to}`;
 
   let events: OddsEvent[];
@@ -198,6 +198,29 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     const under = totals.outcomes.find(o => o.name === 'Under');
     if (over)  { oddsPayload.over_goals  = over.price;  oddsPayload.goals_line = over.point ?? 2.5; }
     if (under) { oddsPayload.under_goals = under.price; }
+  }
+
+  // btts: outcomes named "Yes" / "No"
+  const btts = sb.markets.find(m => m.key === 'btts');
+  if (btts) {
+    const yes = btts.outcomes.find(o => o.name.toLowerCase() === 'yes');
+    const no  = btts.outcomes.find(o => o.name.toLowerCase() === 'no');
+    if (yes) oddsPayload.btts_yes = yes.price;
+    if (no)  oddsPayload.btts_no  = no.price;
+  }
+
+  // double_chance: outcome name matches a team = that team wins or draws;
+  // "No Draw" = either team wins (not a market we track, skip it)
+  const dc = sb.markets.find(m => m.key === 'double_chance');
+  if (dc) {
+    for (const o of dc.outcomes) {
+      if (o.name.toLowerCase() === 'no draw') continue;
+      if (teamsMatch(o.name, event.home_team)) {
+        oddsPayload[flipped ? 'away_or_draw' : 'home_or_draw'] = o.price;
+      } else if (teamsMatch(o.name, event.away_team)) {
+        oddsPayload[flipped ? 'home_or_draw' : 'away_or_draw'] = o.price;
+      }
+    }
   }
 
   // Upsert cache
