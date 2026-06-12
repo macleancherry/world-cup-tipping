@@ -9,6 +9,8 @@ interface Props {
   participants: Participant[]
   budget?: number
   staked?: number
+  assignedParticipantId?: number
+  assignedParticipantName?: string
   onCreated: () => void
   onCancel: () => void
 }
@@ -32,7 +34,7 @@ function marketLabel(market: typeof MARKETS[number], homeTeam?: string, awayTeam
   return market.label
 }
 
-export default function BetForm({ matchDayId, fixtures, participants, budget, staked = 0, onCreated, onCancel }: Props) {
+export default function BetForm({ matchDayId, fixtures, participants, budget, staked = 0, assignedParticipantId, assignedParticipantName, onCreated, onCancel }: Props) {
   const [marketType, setMarketType] = useState<MarketType>('home_win')
   const [goalsLine, setGoalsLine] = useState('2.5')
   const [stake, setStake] = useState('')
@@ -158,6 +160,10 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
     if (selectedFixtures.length === 0) { setError('Select at least one game to bet on'); return }
     if (!stake || stakeNum <= 0) { setError('Enter a valid stake'); return }
     if (!odds || oddsNum < 1.01) { setError('Odds must be at least 1.01'); return }
+    if (assignedParticipantId && participantId && Number(participantId) !== assignedParticipantId) {
+      setError(`Sorry, it's ${assignedParticipantName}'s day today`)
+      return
+    }
 
     const effectiveMarket: MarketType = selectedFixtures.length === 1 ? marketType : 'custom'
     const marketParams = (effectiveMarket === 'over_goals' || effectiveMarket === 'under_goals')
@@ -455,7 +461,14 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
 
           {participants.length > 0 && (
             <div className="form-group">
-              <label className="form-label">Suggested by</label>
+              <label className="form-label">
+                Suggested by
+                {assignedParticipantName && (
+                  <span className="text-muted" style={{ fontWeight: 400, marginLeft: '0.4rem', fontSize: '0.75rem' }}>
+                    · today's bettor is <strong style={{ color: 'var(--socceroos-gold)' }}>{assignedParticipantName}</strong>
+                  </span>
+                )}
+              </label>
               <select className="form-select" value={participantId} onChange={e => setParticipantId(e.target.value ? Number(e.target.value) : '')}>
                 <option value="">— anyone —</option>
                 {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}

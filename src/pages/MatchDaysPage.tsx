@@ -24,6 +24,7 @@ interface MatchDayDetail {
   id: number
   local_date: string
   stage: string | null
+  assigned_participant_id: number | null
   assigned_participant_name: string | null
   budget_amount: number
   status: string
@@ -185,7 +186,17 @@ export default function MatchDaysPage() {
                     </div>
                     <div className="match-day-meta">
                       <span>🏟 {day.fixture_count} fixture{day.fixture_count !== 1 ? 's' : ''}</span>
-                      {day.assigned_participant_name && <span>👤 {day.assigned_participant_name}</span>}
+                      {day.assigned_participant_initials && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            width: 20, height: 20, borderRadius: '50%',
+                            background: 'var(--socceroos-gold)', color: '#000',
+                            fontSize: '0.6rem', fontWeight: 700, flexShrink: 0,
+                          }}>{day.assigned_participant_initials}</span>
+                          {day.assigned_participant_name}
+                        </span>
+                      )}
                       {day.total_staked > 0 && <span>Staked: {formatCents(day.total_staked)}</span>}
                       {day.pending_bets_count > 0 && (
                         <span className="text-yellow">{day.pending_bets_count} pending bet{day.pending_bets_count !== 1 ? 's' : ''}</span>
@@ -303,6 +314,8 @@ export default function MatchDaysPage() {
           participants={participants}
           budget={bettingDetail.budget_amount}
           staked={bettingDetail.bets.reduce((s, b) => s + b.stake_amount, 0)}
+          assignedParticipantId={bettingDetail.assigned_participant_id ?? undefined}
+          assignedParticipantName={bettingDetail.assigned_participant_name ?? undefined}
           onCreated={() => { const id = bettingDayId; setBettingDayId(null); reload(id) }}
           onCancel={() => setBettingDayId(null)}
         />
