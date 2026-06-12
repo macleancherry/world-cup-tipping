@@ -9,7 +9,6 @@ import ResultsPage from './pages/ResultsPage'
 import LeaderboardPage from './pages/LeaderboardPage'
 import SettingsPage from './pages/SettingsPage'
 import ImportExportPage from './pages/ImportExportPage'
-import OraclePage from './pages/OraclePage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { authenticated, loading } = useAuth()
@@ -32,7 +31,6 @@ export default function App() {
             <Route path="leaderboard" element={<LeaderboardPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="import-export" element={<ImportExportPage />} />
-            <Route path="oracle" element={<OraclePage />} />
           </Route>
         </Routes>
       </BrowserRouter>

@@ -20,7 +20,6 @@ export default function AppShell() {
           <NavLink to="/bets">Bets</NavLink>
           <NavLink to="/results">Results</NavLink>
           <NavLink to="/leaderboard">Ladder</NavLink>
-          <NavLink to="/oracle">🐙 Oracle</NavLink>
           <NavLink to="/settings">Settings</NavLink>
           <button className="btn btn-ghost btn-sm" onClick={logout}>Logout</button>
         </nav>

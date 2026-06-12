@@ -253,7 +253,6 @@ function SettingsPageInner() {
 
       {/* Quick links — visible on mobile where these aren't in the nav bar */}
       <div className="card mb-4" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-        <Link to="/oracle" className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center' }}>🐙 Oracle Picks</Link>
         <Link to="/import-export" className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center' }}>📦 Import / Export</Link>
       </div>
 
