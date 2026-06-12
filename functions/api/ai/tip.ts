@@ -146,6 +146,7 @@ Keep it concise and practical. We're a group of mates sharing a betting kitty.`;
 }
 
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
+  const db = ctx.env.DB;
   const body = await ctx.request.json() as { fixture_ids: number[] };
 
   if (!body.fixture_ids?.length) {
@@ -153,7 +154,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   }
 
   const placeholders = body.fixture_ids.map(() => '?').join(',');
-  const result = await ctx.env.DB.prepare(
+  const result = await db.prepare(
     `SELECT id, home_team, away_team, kickoff_utc, stage, group_name, venue, city FROM fixtures WHERE id IN (${placeholders}) ORDER BY kickoff_utc`
   ).bind(...body.fixture_ids).all<FixtureRow>();
 
@@ -162,19 +163,34 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   }
 
   const teams = [...new Set(result.results.flatMap(f => [f.home_team, f.away_team]))];
-  const formMap = await fetchTeamForms(ctx.env.DB, teams);
+  const formMap = await fetchTeamForms(db, teams);
 
-  // Load cached Sportsbet odds for each fixture
+  // Load Sportsbet odds for each fixture — fetch live if not cached
   const oddsMap = new Map<number, OddsData>();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS odds_cache (
+    fixture_id INTEGER PRIMARY KEY, odds_json TEXT NOT NULL,
+    fetch_count INTEGER NOT NULL DEFAULT 0, fetched_at TEXT NOT NULL
+  )`).run();
+
   for (const f of result.results) {
-    const row = await ctx.env.DB.prepare('SELECT fixture_id, odds_json FROM odds_cache WHERE fixture_id = ?')
-      .bind(f.id).first<OddsRow>();
+    // Try cache first
+    const row = await db.prepare('SELECT odds_json FROM odds_cache WHERE fixture_id = ?')
+      .bind(f.id).first<{ odds_json: string }>();
     if (row) {
       try {
         const parsed = JSON.parse(row.odds_json) as OddsData;
-        if (parsed.available) oddsMap.set(f.id, parsed);
-      } catch { /* ignore corrupt cache */ }
+        if (parsed.available) { oddsMap.set(f.id, parsed); continue; }
+      } catch { /* fall through to live fetch */ }
     }
+    // Nothing usable in cache — call the odds endpoint to fetch and cache
+    try {
+      const oddsUrl = new URL(`/api/fixtures/${f.id}/odds`, ctx.request.url);
+      const r = await fetch(oddsUrl.toString());
+      if (r.ok) {
+        const data = await r.json() as OddsData;
+        if (data.available) oddsMap.set(f.id, data);
+      }
+    } catch { /* odds unavailable — AI will note this */ }
   }
 
   const tz = ctx.env.TIMEZONE || 'Australia/Perth';
