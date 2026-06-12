@@ -172,6 +172,7 @@ export default function MatchDaysPage() {
               const isLoadingDetail = loadingDetail.has(day.id)
               const budgetPct = day.budget_amount > 0 ? Math.min(100, (day.total_staked / day.budget_amount) * 100) : 0
               const totalStaked = detail?.bets.reduce((s, b) => s + b.stake_amount, 0) ?? 0
+              const budgetExhausted = detail != null && detail.budget_amount > 0 && totalStaked >= detail.budget_amount
               const pendingBets = detail?.bets.filter(b => b.settlement_status === 'pending') ?? []
               const settledBets = detail?.bets.filter(b => b.settlement_status !== 'pending') ?? []
 
@@ -251,13 +252,19 @@ export default function MatchDaysPage() {
                                 <div className="stat-sub">{pendingBets.length} pending</div>
                               </div>
                             </div>
-                            <button
-                              className="btn btn-primary"
-                              style={{ width: '100%' }}
-                              onClick={() => setBettingDayId(day.id)}
-                            >
-                              + Add Bet
-                            </button>
+                            {budgetExhausted ? (
+                              <p className="text-muted text-sm" style={{ textAlign: 'center', padding: '0.4rem 0', margin: 0 }}>
+                                Daily budget fully used — no more bets for this day
+                              </p>
+                            ) : (
+                              <button
+                                className="btn btn-primary"
+                                style={{ width: '100%' }}
+                                onClick={() => setBettingDayId(day.id)}
+                              >
+                                + Add Bet
+                              </button>
+                            )}
                           </div>
 
                           {/* Fixtures */}
