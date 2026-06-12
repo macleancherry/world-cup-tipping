@@ -25,30 +25,44 @@ interface CacheRow {
   fetched_at: string;
 }
 
-// Normalise team names for fuzzy matching across data sources
+// Normalise team names for fuzzy matching across data sources.
+// Keys are the post-normalisation strings (after NFD + diacritic strip + lower + special-char strip).
 const ALIASES: Record<string, string> = {
+  // Americas
   'usa': 'united states',
   'united states of america': 'united states',
+  'trinidad tobago': 'trinidad and tobago',       // & stripped → "trinidad tobago"
+  // Europe — FIFA official name (DB) vs English bookmaker name (Odds API)
+  'turkiye': 'turkey',                            // "Türkiye" → NFD → "turkiye"
+  'czech republic': 'czechia',
+  // Asia
   'korea republic': 'south korea',
   'republic of korea': 'south korea',
   'ir iran': 'iran',
+  // Africa
   'ivory coast': 'cote divoire',
-  "cote d'ivoire": 'cote divoire',
-  'côte divoire': 'cote divoire',
-  'china pr': 'china',
-  'trinidad & tobago': 'trinidad and tobago',
+  // Bosnia: hyphen stripped → "bosniaherzegovina"; "and" connector variant
   'bosniaherzegovina': 'bosnia herzegovina',
   'bosnia and herzegovina': 'bosnia herzegovina',
-  'bosnia & herzegovina': 'bosnia herzegovina',
+  // Other
+  'china pr': 'china',
   'central african republic': 'car',
   'democratic republic of congo': 'dr congo',
-  'dr congo': 'dr congo',
+  'democratic republic of the congo': 'dr congo',
+  'congo dr': 'dr congo',
   'new zealand': 'nz',
-  'new caledonia': 'new caledonia',
 }
 
 function norm(name: string): string {
-  const n = name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim()
+  // NFD decomposition converts accented chars to base + combining mark (ü → u + ̈, ç → c + ̧),
+  // then stripping the combining range keeps the base letter instead of deleting the whole char.
+  const n = name
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
   return ALIASES[n] ?? n
 }
 
