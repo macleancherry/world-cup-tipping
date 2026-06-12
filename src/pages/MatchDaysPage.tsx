@@ -115,8 +115,8 @@ export default function MatchDaysPage() {
   }
 
   const filtered = days.filter(d => {
-    if (filter === 'upcoming') return d.local_date >= today
-    if (filter === 'complete') return d.local_date < today
+    if (filter === 'upcoming') return d.status === 'upcoming' || d.status === 'in_progress'
+    if (filter === 'complete') return d.status === 'complete' || d.status === 'settled'
     return true
   })
 
