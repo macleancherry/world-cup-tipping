@@ -68,12 +68,18 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     liveWithBets.push({ ...f, pending_bets: betsResult.results });
   }
 
-  // Next match day that still has at least one game that can be bet on
+  // Next match day that still has budget remaining AND at least one bettable game
   const nextBettableMD = await db.prepare(`
     SELECT md.id, md.local_date
     FROM match_days md
     JOIN fixtures f ON f.kickoff_local_date = md.local_date
+    LEFT JOIN (
+      SELECT match_day_id, COALESCE(SUM(stake_amount), 0) AS staked
+      FROM bets WHERE settlement_status != 'void'
+      GROUP BY match_day_id
+    ) ds ON ds.match_day_id = md.id
     WHERE f.status = 'scheduled' AND f.kickoff_utc > datetime('now')
+      AND (md.budget_amount = 0 OR COALESCE(ds.staked, 0) < md.budget_amount)
     ORDER BY f.kickoff_utc ASC
     LIMIT 1
   `).first<{ id: number; local_date: string }>();
