@@ -181,6 +181,23 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     betsAutoSettled++;
   }
 
+  // Auto-update match day statuses based on current fixture and bet state
+  await db.prepare(`
+    UPDATE match_days SET
+      status = CASE
+        WHEN EXISTS(
+          SELECT 1 FROM fixtures f
+          WHERE f.kickoff_local_date = match_days.local_date AND f.status = 'in_progress'
+        ) THEN 'in_progress'
+        WHEN (SELECT COUNT(*) FROM fixtures f WHERE f.kickoff_local_date = match_days.local_date AND f.status = 'scheduled') = 0
+         AND (SELECT COUNT(*) FROM bets b WHERE b.match_day_id = match_days.id AND b.settlement_status = 'pending') = 0
+        THEN 'settled'
+        WHEN (SELECT COUNT(*) FROM fixtures f WHERE f.kickoff_local_date = match_days.local_date AND f.status = 'scheduled') = 0
+        THEN 'complete'
+        ELSE 'upcoming'
+      END
+  `).run();
+
   return json({
     fixtures_updated: fixturesUpdated,
     bets_auto_settled: betsAutoSettled,
