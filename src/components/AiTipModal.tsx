@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { Fixture } from '../types'
 
 interface Props {
@@ -6,7 +6,7 @@ interface Props {
   onClose: () => void
 }
 
-type Mode = 'workers' | 'pick'
+type Mode = 'oracle' | 'pick'
 
 interface AiProvider {
   name: string
@@ -29,7 +29,7 @@ const PROVIDERS: AiProvider[] = [
 const HOST_NATIONS = ['united states', 'usa', 'canada', 'mexico']
 function isHost(team: string) { return HOST_NATIONS.some(h => team.toLowerCase().includes(h)) }
 
-function buildCopyPrompt(fixtures: Fixture[]): string {
+function buildPrompt(fixtures: Fixture[]): string {
   const matchLines = fixtures.map((f, i) => {
     const hostNote = isHost(f.home_team)
       ? ` (${f.home_team} have genuine home advantage as a 2026 World Cup host nation)`
@@ -58,7 +58,7 @@ Keep it concise and practical — we're a group of mates betting from a shared k
 }
 
 export default function AiTipModal({ fixtures, onClose }: Props) {
-  const [mode, setMode] = useState<Mode>('workers')
+  const [mode, setMode] = useState<Mode>('oracle')
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -69,8 +69,8 @@ export default function AiTipModal({ fixtures, onClose }: Props) {
     ? `${fixtures[0].home_team} vs ${fixtures[0].away_team}`
     : `${fixtures.length} games`
 
-  const copyPromptText = buildCopyPrompt(fixtures)
-  const encodedPrompt = encodeURIComponent(copyPromptText)
+  const promptText = buildPrompt(fixtures)
+  const encodedPrompt = encodeURIComponent(promptText)
 
   async function fetchTip() {
     if (abortRef.current) abortRef.current.abort()
@@ -119,8 +119,14 @@ export default function AiTipModal({ fixtures, onClose }: Props) {
     }
   }
 
+  // Auto-consult the Oracle when the modal opens
+  useEffect(() => {
+    fetchTip()
+    return () => { abortRef.current?.abort() }
+  }, [])
+
   async function copyPrompt() {
-    await navigator.clipboard.writeText(copyPromptText)
+    await navigator.clipboard.writeText(promptText)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -133,35 +139,31 @@ export default function AiTipModal({ fixtures, onClose }: Props) {
         onClick={e => e.stopPropagation()}
       >
         <div className="modal-header">
-          <h2 className="modal-title">AI Betting Tip</h2>
+          <div>
+            <h2 className="modal-title">🐙 The Oracle</h2>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
+              Cherry's prediction · {fixtureLabel}
+            </div>
+          </div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
-        <div className="mb-3 font-semibold" style={{ fontSize: '0.95rem' }}>{fixtureLabel}</div>
-
         <div className="tabs" style={{ marginBottom: '1rem' }}>
-          <button className={`tab-btn ${mode === 'workers' ? 'active' : ''}`} onClick={() => setMode('workers')}>
-            ⚡ Quick Tip
+          <button className={`tab-btn ${mode === 'oracle' ? 'active' : ''}`} onClick={() => setMode('oracle')}>
+            🐙 Oracle Tip
           </button>
           <button className={`tab-btn ${mode === 'pick' ? 'active' : ''}`} onClick={() => setMode('pick')}>
             🌐 Open in your AI
           </button>
         </div>
 
-        {mode === 'workers' && (
+        {mode === 'oracle' && (
           <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-            {!content && !loading && !error && (
-              <div style={{ textAlign: 'center', padding: '2rem 0' }}>
-                <p className="text-muted" style={{ marginBottom: '1.25rem' }}>
-                  Free analysis via Cloudflare Workers AI — built into the app, no account needed.
-                </p>
-                <button className="btn btn-primary" onClick={fetchTip}>⚡ Get AI Tip</button>
-              </div>
-            )}
             {loading && !content && (
               <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+                <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🐙</div>
                 <div className="spinner" style={{ margin: '0 auto 0.75rem' }} />
-                <p className="text-muted">Analysing {fixtureLabel}...</p>
+                <p className="text-muted" style={{ fontSize: '0.875rem' }}>Cherry is reading the signs…</p>
               </div>
             )}
             {error && (
@@ -176,7 +178,7 @@ export default function AiTipModal({ fixtures, onClose }: Props) {
                 {loading && <span className="text-muted">▋</span>}
                 {!loading && (
                   <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
-                    <button className="btn btn-sm btn-ghost" onClick={fetchTip}>↺ Refresh</button>
+                    <button className="btn btn-sm btn-ghost" onClick={fetchTip}>🐙 Consult again</button>
                   </div>
                 )}
               </div>

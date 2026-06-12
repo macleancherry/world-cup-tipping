@@ -246,7 +246,7 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
             )}
           </div>
 
-          {/* AI tip — always available */}
+          {/* Oracle — always available */}
           {bettableFixtures.length > 0 && (
             <div style={{ marginBottom: '1rem' }}>
               <button
@@ -255,11 +255,11 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
                 onClick={() => setShowAiTip(true)}
                 style={{ width: '100%' }}
               >
-                🤖 {selectedFixtures.length === 1
-                  ? `Get AI Tip — ${singleFixture?.home_team} vs ${singleFixture?.away_team}`
+                🐙 {selectedFixtures.length === 1
+                  ? `Ask the Oracle — ${singleFixture?.home_team} vs ${singleFixture?.away_team}`
                   : selectedFixtures.length > 1
-                    ? `Get AI Tip — ${selectedFixtures.length} selected games`
-                    : "Get AI Tip — today's games"}
+                    ? `Ask the Oracle — ${selectedFixtures.length} selected games`
+                    : "Ask the Oracle — today's games"}
               </button>
             </div>
           )}
