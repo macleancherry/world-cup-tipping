@@ -561,6 +561,25 @@ tr:hover td { background: var(--bg-elevated); }
   border-color: var(--socceroos-gold);
   background: rgba(255, 209, 0, 0.06);
 }
+
+/* Sportsbet odds chips */
+.odds-chip {
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+.odds-chip:hover { border-color: var(--text-muted); background: var(--bg-elevated); }
+.odds-chip.selected {
+  border-color: var(--socceroos-gold);
+  background: rgba(255, 209, 0, 0.1);
+  font-weight: 600;
+}
 .fixture-check {
   position: absolute;
   right: 0.75rem;

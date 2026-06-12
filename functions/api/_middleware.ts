@@ -7,6 +7,7 @@ export interface Env {
   ADMIN_PASSWORD_HASH: string;
   RESULTS_PROVIDER: string;
   RESULTS_API_KEY?: string;
+  ODDS_API_KEY?: string;
   TIMEZONE: string;
   ALLOW_PUBLIC_READONLY: string;
   ENABLE_AUTO_SETTLEMENT: string;

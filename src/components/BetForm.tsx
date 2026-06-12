@@ -42,6 +42,10 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showAiTip, setShowAiTip] = useState(false)
+  const [oddsData, setOddsData] = useState<Record<string, number> | null>(null)
+  const [oddsLoading, setOddsLoading] = useState(false)
+  const [oddsError, setOddsError] = useState('')
+  const [oddsFixtureId, setOddsFixtureId] = useState<number | null>(null)
 
   const stakeNum = parseFloat(stake) || 0
   const oddsNum = parseFloat(odds) || 0
@@ -77,6 +81,38 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
 
   function toggleFixture(id: number) {
     setSelectedFixtures(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+    // Clear odds when selection changes
+    if (id !== oddsFixtureId) { setOddsData(null); setOddsError('') }
+  }
+
+  async function loadOdds(fixtureId: number) {
+    setOddsLoading(true)
+    setOddsError('')
+    setOddsData(null)
+    setOddsFixtureId(fixtureId)
+    try {
+      const r = await fetch(`/api/fixtures/${fixtureId}/odds`)
+      const d = await r.json() as Record<string, number | boolean | string>
+      if (!d.available) {
+        setOddsError((d.reason as string) || 'Odds not available')
+      } else {
+        const nums: Record<string, number> = {}
+        for (const [k, v] of Object.entries(d)) {
+          if (typeof v === 'number') nums[k] = v
+        }
+        setOddsData(nums)
+      }
+    } catch {
+      setOddsError('Failed to load odds')
+    } finally {
+      setOddsLoading(false)
+    }
+  }
+
+  function applyOdds(market: MarketType, price: number, line?: number) {
+    setMarketType(market)
+    setOdds(price.toFixed(2))
+    if (line != null) setGoalsLine(String(line))
   }
 
   async function submit() {
@@ -213,6 +249,69 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
                 </div>
               )}
             </>
+          )}
+
+          {/* Sportsbet live odds — single game only */}
+          {singleFixture && (
+            <div className="form-group">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <label className="form-label" style={{ margin: 0 }}>Sportsbet odds</label>
+                {!oddsData && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => loadOdds(singleFixture.id)}
+                    disabled={oddsLoading}
+                  >
+                    {oddsLoading ? 'Loading…' : '🔄 Load'}
+                  </button>
+                )}
+                {oddsData && (
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => loadOdds(singleFixture.id)} disabled={oddsLoading}>
+                    ↺ Refresh
+                  </button>
+                )}
+              </div>
+
+              {oddsError && (
+                <p className="text-xs text-muted">{oddsError}</p>
+              )}
+
+              {oddsData && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  {oddsData.home_win != null && (
+                    <button type="button" className={`odds-chip ${marketType === 'home_win' ? 'selected' : ''}`}
+                      onClick={() => applyOdds('home_win', oddsData.home_win)}>
+                      {singleFixture.home_team} <strong>{oddsData.home_win.toFixed(2)}</strong>
+                    </button>
+                  )}
+                  {oddsData.draw != null && (
+                    <button type="button" className={`odds-chip ${marketType === 'draw' ? 'selected' : ''}`}
+                      onClick={() => applyOdds('draw', oddsData.draw)}>
+                      Draw <strong>{oddsData.draw.toFixed(2)}</strong>
+                    </button>
+                  )}
+                  {oddsData.away_win != null && (
+                    <button type="button" className={`odds-chip ${marketType === 'away_win' ? 'selected' : ''}`}
+                      onClick={() => applyOdds('away_win', oddsData.away_win)}>
+                      {singleFixture.away_team} <strong>{oddsData.away_win.toFixed(2)}</strong>
+                    </button>
+                  )}
+                  {oddsData.over_goals != null && (
+                    <button type="button" className={`odds-chip ${marketType === 'over_goals' ? 'selected' : ''}`}
+                      onClick={() => applyOdds('over_goals', oddsData.over_goals, oddsData.goals_line ?? 2.5)}>
+                      Over {oddsData.goals_line ?? 2.5} <strong>{oddsData.over_goals.toFixed(2)}</strong>
+                    </button>
+                  )}
+                  {oddsData.under_goals != null && (
+                    <button type="button" className={`odds-chip ${marketType === 'under_goals' ? 'selected' : ''}`}
+                      onClick={() => applyOdds('under_goals', oddsData.under_goals, oddsData.goals_line ?? 2.5)}>
+                      Under {oddsData.goals_line ?? 2.5} <strong>{oddsData.under_goals.toFixed(2)}</strong>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Stake + odds */}
