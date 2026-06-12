@@ -37,6 +37,14 @@ const ALIASES: Record<string, string> = {
   'côte divoire': 'cote divoire',
   'china pr': 'china',
   'trinidad & tobago': 'trinidad and tobago',
+  'bosniaherzegovina': 'bosnia herzegovina',
+  'bosnia and herzegovina': 'bosnia herzegovina',
+  'bosnia & herzegovina': 'bosnia herzegovina',
+  'central african republic': 'car',
+  'democratic republic of congo': 'dr congo',
+  'dr congo': 'dr congo',
+  'new zealand': 'nz',
+  'new caledonia': 'new caledonia',
 }
 
 function norm(name: string): string {
