@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatCents, formatDate, formatKickoff } from '../hooks/useApi'
 import type { Bet, Fixture } from '../types'
@@ -37,43 +37,25 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [cashoutFixture, setCashoutFixture] = useState<LiveFixture | null>(null)
-  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const loadData = useCallback(() => {
-    return fetch('/api/dashboard')
-      .then(r => r.json())
-      .then(d => setData(d as DashboardData))
+  async function syncAndLoad() {
+    try {
+      await fetch('/api/results/sync', { method: 'POST' })
+    } catch { /* ignore sync errors — stale data is fine */ }
+    const d = await fetch('/api/dashboard').then(r => r.json())
+    setData(d as DashboardData)
+  }
+
+  useEffect(() => {
+    syncAndLoad().finally(() => setLoading(false))
+    const id = setInterval(syncAndLoad, 60_000)
+    return () => clearInterval(id)
   }, [])
-
-  useEffect(() => {
-    loadData().finally(() => setLoading(false))
-  }, [loadData])
-
-  // Auto-sync every 60s when games are live OR kicking off within 3 hours.
-  // Must call the sync endpoint (not just re-read DB) so scores actually update.
-  const hasLive = (data?.live_fixtures?.length ?? 0) > 0
-  const hasImminent = (data?.upcoming_fixtures ?? []).some(
-    f => new Date(f.kickoff_utc).getTime() - Date.now() < 3 * 60 * 60 * 1000
-  )
-  const shouldAutoSync = hasLive || hasImminent
-
-  useEffect(() => {
-    if (refreshTimerRef.current) clearInterval(refreshTimerRef.current)
-    if (!shouldAutoSync) return
-    refreshTimerRef.current = setInterval(async () => {
-      try {
-        await fetch('/api/results/sync', { method: 'POST' })
-      } catch { /* ignore sync errors — stale data is fine */ }
-      await loadData()
-    }, 60_000)
-    return () => { if (refreshTimerRef.current) clearInterval(refreshTimerRef.current) }
-  }, [shouldAutoSync, loadData])
 
   async function syncScores() {
     setSyncing(true)
     try {
-      await fetch('/api/results/sync', { method: 'POST' })
-      await loadData()
+      await syncAndLoad()
     } finally {
       setSyncing(false)
     }

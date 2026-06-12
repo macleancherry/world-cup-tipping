@@ -47,6 +47,7 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
   const [oddsLoading, setOddsLoading] = useState(false)
   const [oddsError, setOddsError] = useState('')
   const [oraclePick, setOraclePick] = useState<{ predicted_winner: 'home' | 'away'; team: string } | null>(null)
+  const [oracleFetched, setOracleFetched] = useState(false)
 
   const stakeNum = parseFloat(stake) || 0
   const oddsNum = parseFloat(odds) || 0
@@ -71,6 +72,7 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
   useEffect(() => {
     if (singleFixture) {
       loadOdds(singleFixture.id)
+      setOracleFetched(false)
       fetch(`/api/oracle/picks?fixture_id=${singleFixture.id}`)
         .then(r => r.json())
         .then((d: { predicted_winner?: 'home' | 'away' } | null) => {
@@ -80,13 +82,15 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
           } else {
             setOraclePick(null)
           }
+          setOracleFetched(true)
         })
-        .catch(() => setOraclePick(null))
+        .catch(() => { setOraclePick(null); setOracleFetched(true) })
     } else {
       setOddsData(null)
       setOddsMeta(null)
       setOddsError('')
       setOraclePick(null)
+      setOracleFetched(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [singleFixture?.id])
@@ -263,7 +267,7 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
           )}
 
           {/* Cherry's oracle pick */}
-          {singleFixture && oraclePick && (
+          {singleFixture && oracleFetched && oraclePick && (
             <div className="oracle-pick-banner">
               <span className="oracle-pick-icon">🐙</span>
               <div className="oracle-pick-body">
@@ -276,7 +280,6 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
                 onClick={() => {
                   const market: MarketType = oraclePick.predicted_winner === 'home' ? 'home_win' : 'away_win'
                   setMarketType(market)
-                  // If odds are loaded for this market, apply them too
                   if (oddsData) {
                     const price = oraclePick.predicted_winner === 'home' ? oddsData.home_win : oddsData.away_win
                     if (price) setOdds(price.toFixed(2))
@@ -285,6 +288,11 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
               >
                 Bet with Cherry
               </button>
+            </div>
+          )}
+          {singleFixture && oracleFetched && !oraclePick && (
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+              🐙 Cherry hasn't picked this game yet
             </div>
           )}
 
