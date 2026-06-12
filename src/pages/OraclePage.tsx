@@ -26,6 +26,17 @@ interface UnpickedFixture {
   group_name: string | null
 }
 
+interface ExtractResult {
+  fixture_id: number
+  home_team: string
+  away_team: string
+  kickoff_utc: string
+  predicted_winner: 'home' | 'away'
+  predicted_team: string
+  confidence: string
+  source_used: string
+}
+
 interface PickFormState {
   fixtureId: number
   homeTeam: string
@@ -42,6 +53,12 @@ export default function OraclePage() {
   const [form, setForm] = useState<PickFormState | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // Extractor state
+  const [extractInput, setExtractInput] = useState('')
+  const [extracting, setExtracting] = useState(false)
+  const [extractError, setExtractError] = useState('')
+  const [extractResult, setExtractResult] = useState<ExtractResult | null>(null)
 
   async function load() {
     setLoading(true)
@@ -104,6 +121,61 @@ export default function OraclePage() {
     }
   }
 
+  async function extract() {
+    setExtracting(true)
+    setExtractError('')
+    setExtractResult(null)
+    const isUrl = extractInput.startsWith('http://') || extractInput.startsWith('https://')
+    try {
+      const r = await fetch('/api/oracle/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(isUrl ? { url: extractInput } : { text: extractInput }),
+      })
+      const d = await r.json() as ExtractResult & { error?: string; fallback?: boolean }
+      if (!r.ok) {
+        setExtractError(d.error ?? `HTTP ${r.status}`)
+        // If URL was blocked, prompt to paste text instead
+        if (d.fallback) setExtractInput('')
+      } else {
+        setExtractResult(d)
+      }
+    } catch (e) {
+      setExtractError((e as Error).message)
+    } finally {
+      setExtracting(false)
+    }
+  }
+
+  async function applyExtracted() {
+    if (!extractResult) return
+    setSaving(true)
+    setExtractError('')
+    try {
+      const r = await fetch('/api/oracle/picks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fixture_id: extractResult.fixture_id,
+          predicted_winner: extractResult.predicted_winner,
+          notes: null,
+          source_url: extractResult.source_used.startsWith('http') ? extractResult.source_used : null,
+        }),
+      })
+      if (!r.ok) {
+        const e = await r.json() as { error: string }
+        throw new Error(e.error)
+      }
+      setExtractResult(null)
+      setExtractInput('')
+      await load()
+    } catch (e) {
+      setExtractError((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function deletePick(fixtureId: number) {
     if (!confirm('Remove Cherry\'s pick for this game?')) return
     await fetch(`/api/oracle/picks?fixture_id=${fixtureId}`, { method: 'DELETE' })
@@ -136,8 +208,73 @@ export default function OraclePage() {
         </a>
       </div>
 
-      <div className="alert alert-info" style={{ marginBottom: '1.5rem', fontSize: '0.875rem' }}>
-        Cherry lives at the <strong>Two Oceans Aquarium</strong> in Cape Town. Watch their Instagram for each prediction, then record it here so it shows up on the bet form.
+      {/* Extractor */}
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <div className="card-header">
+          <span className="card-title">🔍 Extract Cherry's Pick</span>
+        </div>
+        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+          Paste an article URL <em>or</em> copy-paste the text from Instagram / a news article. The AI will find the prediction and match it to a fixture.
+        </p>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+          <textarea
+            className="form-input"
+            value={extractInput}
+            onChange={e => { setExtractInput(e.target.value); setExtractResult(null); setExtractError('') }}
+            placeholder={'Paste a URL (e.g. https://www.news24.com/…)\nor paste the text directly:\n"Cherry the octopus has chosen Mexico to beat South Africa…"'}
+            rows={3}
+            style={{ flex: 1, resize: 'vertical', fontFamily: 'inherit', fontSize: '0.85rem' }}
+          />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={extract}
+            disabled={extracting || !extractInput.trim()}
+          >
+            {extracting ? 'Extracting…' : '🔍 Extract pick'}
+          </button>
+          <a
+            href="https://www.instagram.com/2oceansaquarium/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-ghost btn-sm"
+          >
+            Open @2oceansaquarium ↗
+          </a>
+        </div>
+
+        {extractError && (
+          <div className="alert alert-error" style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>
+            {extractError}
+          </div>
+        )}
+
+        {extractResult && (
+          <div style={{
+            marginTop: '0.75rem', padding: '0.75rem', borderRadius: 'var(--radius-md)',
+            border: '1px solid rgba(124,58,237,0.3)', background: 'rgba(124,58,237,0.06)',
+          }}>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
+              Found prediction · confidence: {extractResult.confidence}
+            </div>
+            <div className="font-semibold" style={{ marginBottom: '0.2rem' }}>
+              {extractResult.home_team} vs {extractResult.away_team}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <span style={{ fontSize: '0.9rem' }}>🐙 Cherry picks:</span>
+              <span className="badge badge-oracle">{extractResult.predicted_team} to win</span>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button className="btn btn-primary btn-sm" onClick={applyExtracted} disabled={saving}>
+                {saving ? 'Saving…' : '✓ Apply this pick'}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setExtractResult(null); setExtractInput('') }}>
+                Discard
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Unpicked upcoming fixtures */}
