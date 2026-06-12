@@ -8,10 +8,10 @@ export default function AppShell() {
     <div className="app-shell">
       <header className="app-header">
         <a href="/" className="logo">
-          <div className="logo-badge">🦘</div>
+          <div className="logo-badge">⚽</div>
           <span>
-            <span className="logo-text-main">Socceroos</span>{' '}
-            <span className="logo-text-sub">Kitty</span>
+            <span className="logo-text-main">Audere est Suffer</span>{' '}
+            <span className="logo-text-sub">WC Bets</span>
           </span>
         </a>
         <nav className="app-nav desktop-nav">
