@@ -6,9 +6,27 @@ interface Props {
   onClose: () => void
 }
 
-type Mode = 'workers' | 'copy'
+type Mode = 'workers' | 'pick'
 
-function buildCopyPrompt(homeTeam: string, awayTeam: string): string {
+interface AiProvider {
+  name: string
+  by: string
+  dot: string
+  buildUrl: (encoded: string) => string
+}
+
+const PROVIDERS: AiProvider[] = [
+  { name: 'ChatGPT',    by: 'OpenAI',      dot: '#10a37f', buildUrl: q => `https://chatgpt.com/?q=${q}` },
+  { name: 'Claude',     by: 'Anthropic',   dot: '#c67f3c', buildUrl: q => `https://claude.ai/new?q=${q}` },
+  { name: 'Gemini',     by: 'Google',      dot: '#4285f4', buildUrl: q => `https://gemini.google.com/app?q=${q}` },
+  { name: 'Copilot',    by: 'Microsoft',   dot: '#0078d4', buildUrl: q => `https://copilot.microsoft.com/?q=${q}` },
+  { name: 'Perplexity', by: 'Perplexity',  dot: '#20b2aa', buildUrl: q => `https://www.perplexity.ai/?q=${q}` },
+  { name: 'Grok',       by: 'xAI',         dot: '#111111', buildUrl: q => `https://x.com/i/grok?text=${q}` },
+  { name: 'Meta AI',    by: 'Meta',        dot: '#0866ff', buildUrl: q => `https://www.meta.ai/?q=${q}` },
+  { name: 'DeepSeek',   by: 'DeepSeek',    dot: '#3b82f6', buildUrl: q => `https://chat.deepseek.com/?q=${q}` },
+]
+
+function buildPrompt(homeTeam: string, awayTeam: string): string {
   return `Betting analysis for this 2026 FIFA World Cup match: ${homeTeam} vs ${awayTeam}.
 
 Please provide:
@@ -28,6 +46,9 @@ export default function AiTipModal({ fixture, onClose }: Props) {
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+
+  const prompt = buildPrompt(fixture.home_team, fixture.away_team)
+  const encodedPrompt = encodeURIComponent(prompt)
 
   async function fetchTip() {
     if (abortRef.current) abortRef.current.abort()
@@ -68,28 +89,23 @@ export default function AiTipModal({ fixture, onClose }: Props) {
         }
       }
     } catch (e) {
-      if ((e as Error).name !== 'AbortError') {
-        setError((e as Error).message)
-      }
+      if ((e as Error).name !== 'AbortError') setError((e as Error).message)
     } finally {
       setLoading(false)
     }
   }
 
   async function copyPrompt() {
-    const prompt = buildCopyPrompt(fixture.home_team, fixture.away_team)
     await navigator.clipboard.writeText(prompt)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const copyPromptText = buildCopyPrompt(fixture.home_team, fixture.away_team)
-
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal"
-        style={{ maxWidth: '560px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}
+        style={{ maxWidth: '520px', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}
         onClick={e => e.stopPropagation()}
       >
         <div className="modal-header">
@@ -101,55 +117,44 @@ export default function AiTipModal({ fixture, onClose }: Props) {
           {fixture.home_team} vs {fixture.away_team}
         </div>
 
-        {/* Mode tabs */}
         <div className="tabs" style={{ marginBottom: '1rem' }}>
-          <button
-            className={`tab-btn ${mode === 'workers' ? 'active' : ''}`}
-            onClick={() => setMode('workers')}
-          >
-            ⚡ AI Quick Tip
+          <button className={`tab-btn ${mode === 'workers' ? 'active' : ''}`} onClick={() => setMode('workers')}>
+            ⚡ Quick Tip
           </button>
-          <button
-            className={`tab-btn ${mode === 'copy' ? 'active' : ''}`}
-            onClick={() => setMode('copy')}
-          >
-            💬 Ask ChatGPT / Claude
+          <button className={`tab-btn ${mode === 'pick' ? 'active' : ''}`} onClick={() => setMode('pick')}>
+            🌐 Open in your AI
           </button>
         </div>
 
+        {/* Workers AI tab */}
         {mode === 'workers' && (
           <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
             {!content && !loading && !error && (
               <div style={{ textAlign: 'center', padding: '2rem 0' }}>
                 <p className="text-muted" style={{ marginBottom: '1.25rem' }}>
-                  Get an AI-generated analysis using Cloudflare Workers AI (free, built-in).
+                  Free analysis via Cloudflare Workers AI — built into the app, no account needed.
                 </p>
-                <button className="btn btn-primary" onClick={fetchTip}>
-                  ⚡ Get AI Tip
-                </button>
+                <button className="btn btn-primary" onClick={fetchTip}>⚡ Get AI Tip</button>
               </div>
             )}
-
             {loading && !content && (
               <div style={{ textAlign: 'center', padding: '2rem 0' }}>
                 <div className="spinner" style={{ margin: '0 auto 0.75rem' }} />
                 <p className="text-muted">Analysing match...</p>
               </div>
             )}
-
             {error && (
               <div className="alert alert-error">
                 {error}
                 <button className="btn btn-sm btn-ghost" style={{ marginLeft: '0.5rem' }} onClick={fetchTip}>Retry</button>
               </div>
             )}
-
             {content && (
               <div style={{ fontSize: '0.875rem', lineHeight: '1.65' }}>
                 <MarkdownText text={content} />
                 {loading && <span className="text-muted">▋</span>}
                 {!loading && (
-                  <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)', display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
                     <button className="btn btn-sm btn-ghost" onClick={fetchTip}>↺ Refresh</button>
                   </div>
                 )}
@@ -158,49 +163,68 @@ export default function AiTipModal({ fixture, onClose }: Props) {
           </div>
         )}
 
-        {mode === 'copy' && (
+        {/* Provider picker tab */}
+        {mode === 'pick' && (
           <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-            <p className="text-muted" style={{ fontSize: '0.875rem', marginBottom: '0.75rem' }}>
-              Click a button to open ChatGPT or Claude with the prompt pre-loaded, or copy it for any other AI.
+            <p className="text-muted" style={{ fontSize: '0.82rem', marginBottom: '0.75rem' }}>
+              Pick your preferred AI — the prompt opens pre-loaded and ready to go.
             </p>
-            <textarea
-              readOnly
-              value={copyPromptText}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              {PROVIDERS.map(p => (
+                <a
+                  key={p.name}
+                  href={p.buildUrl(encodedPrompt)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-surface)',
+                    color: 'var(--text-primary)',
+                    textDecoration: 'none',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-elevated)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-surface)')}
+                >
+                  <span
+                    style={{
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      background: p.dot,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span style={{ flex: 1, fontWeight: 600, fontSize: '0.9rem' }}>{p.name}</span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>by {p.by}</span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>↗</span>
+                </a>
+              ))}
+            </div>
+
+            <div
               style={{
-                width: '100%',
-                minHeight: '200px',
-                fontFamily: 'inherit',
-                fontSize: '0.8rem',
-                lineHeight: '1.5',
-                padding: '0.75rem',
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border)',
-                borderRadius: '0.5rem',
-                color: 'var(--text-primary)',
-                resize: 'vertical',
-                boxSizing: 'border-box',
+                marginTop: '1rem',
+                paddingTop: '0.75rem',
+                borderTop: '1px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '0.5rem',
               }}
-            />
-            <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <button className="btn btn-ghost btn-sm" onClick={copyPrompt}>
-                {copied ? '✓ Copied!' : '📋 Copy'}
+            >
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                Prompt not pre-filling? Copy and paste manually.
+              </span>
+              <button className="btn btn-ghost btn-sm" onClick={copyPrompt} style={{ flexShrink: 0 }}>
+                {copied ? '✓ Copied!' : '📋 Copy prompt'}
               </button>
-              <a
-                href={`https://chatgpt.com/?q=${encodeURIComponent(copyPromptText)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-ghost btn-sm"
-              >
-                Ask ChatGPT ↗
-              </a>
-              <a
-                href={`https://claude.ai/new?q=${encodeURIComponent(copyPromptText)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-ghost btn-sm"
-              >
-                Ask Claude ↗
-              </a>
             </div>
           </div>
         )}
