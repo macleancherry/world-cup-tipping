@@ -185,7 +185,9 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     // Nothing usable in cache — call the odds endpoint to fetch and cache
     try {
       const oddsUrl = new URL(`/api/fixtures/${f.id}/odds`, ctx.request.url);
-      const r = await fetch(oddsUrl.toString());
+      const r = await fetch(oddsUrl.toString(), {
+        headers: { Cookie: ctx.request.headers.get('Cookie') ?? '' },
+      });
       if (r.ok) {
         const data = await r.json() as OddsData;
         if (data.available) oddsMap.set(f.id, data);
