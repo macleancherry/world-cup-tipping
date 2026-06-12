@@ -14,9 +14,17 @@ export const onRequestPut: PagesFunction<Env> = async (ctx) => {
   if (bet.settlement_status !== 'pending') return json({ error: 'Cannot edit settled bet' }, 400);
 
   const body = await ctx.request.json() as Record<string, unknown>;
+
+  // placed can be toggled on any bet regardless of settlement status
+  if (Object.keys(body).length === 1 && body.placed !== undefined) {
+    const updated = await ctx.env.DB.prepare("UPDATE bets SET placed = ?, updated_at = datetime('now') WHERE id = ? RETURNING *")
+      .bind(body.placed ? 1 : 0, ctx.params.id).first();
+    return json(updated);
+  }
+
   const fields: string[] = [];
   const values: unknown[] = [];
-  const editable = ['title', 'description', 'bet_type', 'market_type', 'market_params_json', 'bookmaker', 'notes'];
+  const editable = ['title', 'description', 'bet_type', 'market_type', 'market_params_json', 'bookmaker', 'notes', 'placed'];
   for (const k of editable) {
     if (body[k] !== undefined) { fields.push(`${k} = ?`); values.push(body[k]); }
   }

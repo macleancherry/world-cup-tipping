@@ -114,6 +114,15 @@ export default function MatchDaysPage() {
     reload(bet.match_day_id)
   }
 
+  async function togglePlaced(bet: Bet) {
+    await fetch(`/api/bets/${bet.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ placed: bet.placed ? 0 : 1 }),
+    })
+    reload(bet.match_day_id)
+  }
+
   const filtered = days.filter(d => {
     if (filter === 'upcoming') return d.status === 'upcoming' || d.status === 'in_progress'
     if (filter === 'complete') return d.status === 'complete' || d.status === 'settled'
@@ -269,6 +278,7 @@ export default function MatchDaysPage() {
                                   bet={bet}
                                   onSettle={b => setSettlingBet(b)}
                                   onDelete={deleteBet}
+                                  onTogglePlaced={togglePlaced}
                                 />
                               ))}
                             </div>

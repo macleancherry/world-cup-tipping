@@ -2,6 +2,9 @@ import type { PagesFunction } from '@cloudflare/workers-types';
 import type { Env } from '../_middleware';
 
 export const onRequestGet: PagesFunction<Env> = async (ctx) => {
+  // Ensure placed column exists (idempotent)
+  try { await ctx.env.DB.prepare('ALTER TABLE bets ADD COLUMN placed INTEGER NOT NULL DEFAULT 0').run() } catch {}
+
   const url = new URL(ctx.request.url);
   const status = url.searchParams.get('status');
   const matchDayId = url.searchParams.get('match_day_id');

@@ -77,6 +77,7 @@ export interface Bet {
   potential_return: number;
   potential_profit: number;
   settlement_status: SettlementStatus;
+  placed: number; // 0 = not yet placed on Sportsbet, 1 = placed
   actual_return: number | null;
   cashout_amount: number | null;
   settled_at: string | null;

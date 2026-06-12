@@ -6,6 +6,7 @@ interface Props {
   onSettle?: (bet: Bet) => void
   onReopen?: (bet: Bet) => void
   onDelete?: (bet: Bet) => void
+  onTogglePlaced?: (bet: Bet) => void
 }
 
 function statusBadge(status: string) {
@@ -28,9 +29,10 @@ function netImpact(bet: Bet): number {
   return 0
 }
 
-export default function BetCard({ bet, onSettle, onReopen, onDelete }: Props) {
+export default function BetCard({ bet, onSettle, onReopen, onDelete, onTogglePlaced }: Props) {
   const impact = netImpact(bet)
   const isPending = bet.settlement_status === 'pending'
+  const isPlaced = Boolean(bet.placed)
 
   return (
     <div className="bet-card">
@@ -44,9 +46,16 @@ export default function BetCard({ bet, onSettle, onReopen, onDelete }: Props) {
             <div className="text-xs text-secondary mt-1">👤 {(bet as any).participant_name}</div>
           )}
         </div>
-        <span className={`badge ${statusBadge(bet.settlement_status)}`}>
-          {bet.settlement_status.replace('_', ' ')}
-        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
+          <span className={`badge ${statusBadge(bet.settlement_status)}`}>
+            {bet.settlement_status.replace('_', ' ')}
+          </span>
+          {isPending && (
+            <span style={{ fontSize: '0.65rem', color: isPlaced ? 'var(--accent-green)' : 'var(--text-muted)', fontWeight: 600 }}>
+              {isPlaced ? '✓ on Sportsbet' : '○ not placed'}
+            </span>
+          )}
+        </div>
       </div>
 
       {(bet.fixtures as any[])?.length > 0 && (
@@ -94,6 +103,15 @@ export default function BetCard({ bet, onSettle, onReopen, onDelete }: Props) {
       </div>
 
       <div className="flex gap-2 mt-3" style={{ justifyContent: 'flex-end' }}>
+        {isPending && onTogglePlaced && (
+          <button
+            className="btn btn-ghost btn-sm"
+            style={{ color: isPlaced ? 'var(--accent-green)' : 'var(--text-muted)' }}
+            onClick={() => onTogglePlaced(bet)}
+          >
+            {isPlaced ? '✓ Placed' : '○ Mark placed'}
+          </button>
+        )}
         {isPending && onSettle && (
           <button className="btn btn-primary btn-sm" onClick={() => onSettle(bet)}>Settle</button>
         )}
