@@ -449,7 +449,7 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
           {participants.length > 0 && (
             <div className="form-group">
               <label className="form-label">
-                Suggested by
+                Submitted by
                 {assignedParticipantName && (
                   <span className="text-muted" style={{ fontWeight: 400, marginLeft: '0.4rem', fontSize: '0.75rem' }}>
                     · today's bettor is <strong style={{ color: 'var(--socceroos-gold)' }}>{assignedParticipantName}</strong>
