@@ -57,6 +57,7 @@ export type MarketType =
   | 'home_win' | 'away_win' | 'draw'
   | 'home_or_draw' | 'away_or_draw'
   | 'over_goals' | 'under_goals'
+  | 'home_spread' | 'away_spread'
   | 'btts_yes' | 'btts_no'
   | 'custom';
 

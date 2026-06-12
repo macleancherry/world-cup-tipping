@@ -113,7 +113,7 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
 
   const url = `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds` +
     `?apiKey=${ctx.env.ODDS_API_KEY}` +
-    `&regions=au&markets=h2h,totals&bookmakers=sportsbet` +
+    `&regions=au&markets=h2h,totals,spreads&bookmakers=sportsbet` +
     `&commenceTimeFrom=${from}&commenceTimeTo=${to}`;
 
   let events: OddsEvent[];
@@ -207,6 +207,20 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     const under = totals.outcomes.find(o => o.name === 'Under');
     if (over)  { oddsPayload.over_goals  = over.price;  oddsPayload.goals_line = over.point ?? 2.5; }
     if (under) { oddsPayload.under_goals = under.price; }
+  }
+
+  // spreads (Asian/points handicap)
+  const spreads = sb.markets.find(m => m.key === 'spreads');
+  if (spreads) {
+    for (const o of spreads.outcomes) {
+      if (teamsMatch(o.name, event.home_team)) {
+        oddsPayload[flipped ? 'away_spread' : 'home_spread'] = o.price;
+        oddsPayload[flipped ? 'away_spread_line' : 'home_spread_line'] = o.point ?? 0;
+      } else if (teamsMatch(o.name, event.away_team)) {
+        oddsPayload[flipped ? 'home_spread' : 'away_spread'] = o.price;
+        oddsPayload[flipped ? 'home_spread_line' : 'away_spread_line'] = o.point ?? 0;
+      }
+    }
   }
 
   // btts: outcomes named "Yes" / "No"

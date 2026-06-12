@@ -23,6 +23,8 @@ const MARKETS: { value: MarketType; label: string; homeLabel?: string; awayLabel
   { value: 'away_or_draw', label: 'Away or Draw',     awayLabel: '{away} or Draw' },
   { value: 'over_goals',   label: 'Over Goals' },
   { value: 'under_goals',  label: 'Under Goals' },
+  { value: 'home_spread',  label: 'Home Spread', homeLabel: '{home} Spread' },
+  { value: 'away_spread',  label: 'Away Spread', awayLabel: '{away} Spread' },
   { value: 'btts_yes',     label: 'Both Teams to Score' },
   { value: 'btts_no',      label: 'Both Teams NOT to Score' },
   { value: 'custom',       label: 'Other / Custom' },
@@ -37,6 +39,7 @@ function marketLabel(market: typeof MARKETS[number], homeTeam?: string, awayTeam
 export default function BetForm({ matchDayId, fixtures, participants, budget, staked = 0, assignedParticipantId, assignedParticipantName, onCreated, onCancel }: Props) {
   const [marketType, setMarketType] = useState<MarketType>('home_win')
   const [goalsLine, setGoalsLine] = useState('2.5')
+  const [spreadLine, setSpreadLine] = useState('0')
   const [stake, setStake] = useState('')
   const [odds, setOdds] = useState('')
   const [participantId, setParticipantId] = useState<number | ''>('')
@@ -112,6 +115,7 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
     : bettableFixtures
 
   const goalsSelected = marketType === 'over_goals' || marketType === 'under_goals'
+  const spreadSelected = marketType === 'home_spread' || marketType === 'away_spread'
 
   function toggleFixture(id: number) {
     setSelectedFixtures(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -152,7 +156,10 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
   function applyOdds(market: MarketType, price: number, line?: number) {
     setMarketType(market)
     setOdds(price.toFixed(2))
-    if (line != null) setGoalsLine(String(line))
+    if (line != null) {
+      if (market === 'home_spread' || market === 'away_spread') setSpreadLine(String(line))
+      else setGoalsLine(String(line))
+    }
   }
 
   async function submit() {
@@ -168,7 +175,9 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
     const effectiveMarket: MarketType = selectedFixtures.length === 1 ? marketType : 'custom'
     const marketParams = (effectiveMarket === 'over_goals' || effectiveMarket === 'under_goals')
       ? JSON.stringify({ line: parseFloat(goalsLine) || 2.5 })
-      : null
+      : (effectiveMarket === 'home_spread' || effectiveMarket === 'away_spread')
+        ? JSON.stringify({ line: parseFloat(spreadLine) || 0 })
+        : null
 
     setLoading(true)
     try {
@@ -343,6 +352,12 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
                       <input type="number" className="form-input" value={goalsLine} onChange={e => setGoalsLine(e.target.value)} step="0.5" min="0.5" />
                     </div>
                   )}
+                  {spreadSelected && (
+                    <div className="form-group" style={{ marginTop: '0.75rem' }}>
+                      <label className="form-label">Handicap line</label>
+                      <input type="number" className="form-input" value={spreadLine} onChange={e => setSpreadLine(e.target.value)} step="0.5" />
+                    </div>
+                  )}
                 </>
               )}
 
@@ -379,6 +394,18 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
                         Under {oddsData.goals_line ?? 2.5} <strong>{oddsData.under_goals.toFixed(2)}</strong>
                       </button>
                     )}
+                    {oddsData.home_spread != null && (
+                      <button type="button" className={`odds-chip ${marketType === 'home_spread' ? 'selected' : ''}`}
+                        onClick={() => applyOdds('home_spread', oddsData.home_spread, oddsData.home_spread_line ?? 0)}>
+                        {singleFixture.home_team} {(oddsData.home_spread_line ?? 0) >= 0 ? '+' : ''}{oddsData.home_spread_line ?? 0} <strong>{oddsData.home_spread.toFixed(2)}</strong>
+                      </button>
+                    )}
+                    {oddsData.away_spread != null && (
+                      <button type="button" className={`odds-chip ${marketType === 'away_spread' ? 'selected' : ''}`}
+                        onClick={() => applyOdds('away_spread', oddsData.away_spread, oddsData.away_spread_line ?? 0)}>
+                        {singleFixture.away_team} {(oddsData.away_spread_line ?? 0) >= 0 ? '+' : ''}{oddsData.away_spread_line ?? 0} <strong>{oddsData.away_spread.toFixed(2)}</strong>
+                      </button>
+                    )}
                     {oddsData.btts_yes != null && (
                       <button type="button" className={`odds-chip ${marketType === 'btts_yes' ? 'selected' : ''}`}
                         onClick={() => applyOdds('btts_yes', oddsData.btts_yes)}>
@@ -408,6 +435,12 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
                     <div className="form-group" style={{ marginTop: '0.75rem' }}>
                       <label className="form-label">Goals line</label>
                       <input type="number" className="form-input" value={goalsLine} onChange={e => setGoalsLine(e.target.value)} step="0.5" min="0.5" />
+                    </div>
+                  )}
+                  {spreadSelected && (
+                    <div className="form-group" style={{ marginTop: '0.75rem' }}>
+                      <label className="form-label">Handicap line</label>
+                      <input type="number" className="form-input" value={spreadLine} onChange={e => setSpreadLine(e.target.value)} step="0.5" />
                     </div>
                   )}
                   {oddsMeta && (
