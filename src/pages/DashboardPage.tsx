@@ -24,6 +24,7 @@ interface DashboardData {
     today_staked: number
     today_budget: number
   } | null
+  next_bettable_match_day_id: number | null
   upcoming_fixtures: Fixture[]
   recent_fixtures: Fixture[]
   live_fixtures: LiveFixture[]
@@ -71,7 +72,10 @@ export default function DashboardPage() {
   if (loading) return <div className="loading-screen"><div className="spinner" /></div>
   if (!data) return <div className="alert alert-error">Failed to load dashboard</div>
 
-  const { kitty, today_match_day: today, upcoming_fixtures, recent_fixtures, live_fixtures = [], pending_bets, needs_settlement } = data
+  const { kitty, today_match_day: today, next_bettable_match_day_id, upcoming_fixtures, recent_fixtures, live_fixtures = [], pending_bets, needs_settlement } = data
+  const addBetPath = next_bettable_match_day_id
+    ? `/match-days/${next_bettable_match_day_id}`
+    : '/match-days'
   const pnl = kitty.balance - kitty.starting_kitty
 
   return (
@@ -81,10 +85,7 @@ export default function DashboardPage() {
           <h1 className="page-title">⚽ World Cup 2026</h1>
           <p className="page-subtitle">Betting Kitty Dashboard</p>
         </div>
-        <Link
-          to={today ? `/match-days/${today.id}` : '/match-days'}
-          className="btn btn-primary btn-lg"
-        >
+        <Link to={addBetPath} className="btn btn-primary btn-lg">
           + Add Bet
         </Link>
       </div>
@@ -243,7 +244,7 @@ export default function DashboardPage() {
               </div>
               {upcoming_fixtures.length > 0 && (
                 <Link
-                  to={`/match-days/${today.id}`}
+                  to={addBetPath}
                   className="btn btn-primary btn-block"
                   style={{ marginTop: '0.75rem' }}
                 >

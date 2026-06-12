@@ -68,6 +68,16 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     liveWithBets.push({ ...f, pending_bets: betsResult.results });
   }
 
+  // Next match day that still has at least one game that can be bet on
+  const nextBettableMD = await db.prepare(`
+    SELECT md.id, md.local_date
+    FROM match_days md
+    JOIN fixtures f ON f.kickoff_local_date = md.local_date
+    WHERE f.status = 'scheduled' AND f.kickoff_utc > datetime('now')
+    ORDER BY f.kickoff_utc ASC
+    LIMIT 1
+  `).first<{ id: number; local_date: string }>();
+
   return new Response(JSON.stringify({
     kitty: {
       balance,
@@ -79,6 +89,7 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
       unsettled_completed_count: needsSettlement.results.length,
     },
     today_match_day: todayMD ? { ...todayMD, today_staked: todayStaked, today_budget: todayBudget } : null,
+    next_bettable_match_day_id: nextBettableMD?.id ?? null,
     upcoming_fixtures: upcomingFixtures.results,
     recent_fixtures: recentFixtures.results,
     live_fixtures: liveWithBets,
