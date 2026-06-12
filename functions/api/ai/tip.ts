@@ -20,6 +20,29 @@ interface ResultRow {
   kickoff_utc: string;
 }
 
+interface OddsRow {
+  fixture_id: number;
+  odds_json: string;
+}
+
+interface OddsData {
+  available?: boolean;
+  home_win?: number;
+  draw?: number;
+  away_win?: number;
+  over_goals?: number;
+  under_goals?: number;
+  goals_line?: number;
+  home_spread?: number;
+  away_spread?: number;
+  home_spread_line?: number;
+  away_spread_line?: number;
+  btts_yes?: number;
+  btts_no?: number;
+  home_or_draw?: number;
+  away_or_draw?: number;
+}
+
 const HOST_NATIONS = ['United States', 'USA', 'United States of America', 'Canada', 'Mexico'];
 
 function isHostNation(team: string): boolean {
@@ -55,7 +78,23 @@ async function fetchTeamForms(db: D1Database, teams: string[]): Promise<Map<stri
   return formMap;
 }
 
-function buildPrompt(fixtures: FixtureRow[], tz: string, formMap: Map<string, string>): string {
+function formatOdds(odds: OddsData, homeTeam: string, awayTeam: string): string {
+  const lines: string[] = [];
+  if (odds.home_win)   lines.push(`${homeTeam} win @ ${odds.home_win.toFixed(2)}`);
+  if (odds.draw)       lines.push(`Draw @ ${odds.draw.toFixed(2)}`);
+  if (odds.away_win)   lines.push(`${awayTeam} win @ ${odds.away_win.toFixed(2)}`);
+  if (odds.over_goals)  lines.push(`Over ${odds.goals_line ?? 2.5} goals @ ${odds.over_goals.toFixed(2)}`);
+  if (odds.under_goals) lines.push(`Under ${odds.goals_line ?? 2.5} goals @ ${odds.under_goals.toFixed(2)}`);
+  if (odds.home_spread != null && odds.home_spread_line != null)
+    lines.push(`${homeTeam} ${odds.home_spread_line >= 0 ? '+' : ''}${odds.home_spread_line} @ ${odds.home_spread.toFixed(2)}`);
+  if (odds.away_spread != null && odds.away_spread_line != null)
+    lines.push(`${awayTeam} ${odds.away_spread_line >= 0 ? '+' : ''}${odds.away_spread_line} @ ${odds.away_spread.toFixed(2)}`);
+  if (odds.btts_yes)   lines.push(`BTTS Yes @ ${odds.btts_yes.toFixed(2)}`);
+  if (odds.btts_no)    lines.push(`BTTS No @ ${odds.btts_no.toFixed(2)}`);
+  return lines.length ? lines.join(' | ') : 'No Sportsbet odds available yet';
+}
+
+function buildPrompt(fixtures: FixtureRow[], tz: string, formMap: Map<string, string>, oddsMap: Map<number, OddsData>): string {
   const matchLines = fixtures.map((f, i) => {
     const kickoff = new Date(f.kickoff_utc).toLocaleString('en-AU', {
       weekday: 'short', day: 'numeric', month: 'short',
@@ -75,10 +114,13 @@ function buildPrompt(fixtures: FixtureRow[], tz: string, formMap: Map<string, st
 
     const homeForm = formMap.get(f.home_team) ?? 'Unknown';
     const awayForm = formMap.get(f.away_team) ?? 'Unknown';
+    const odds = oddsMap.get(f.id);
+    const oddsLine = odds ? formatOdds(odds, f.home_team, f.away_team) : 'No Sportsbet odds available yet';
 
     return [
       `${fixtures.length > 1 ? `Match ${i + 1}: ` : ''}**${f.home_team} vs ${f.away_team}**${stage}${venue}, ${kickoff}${hostNote}`,
       `2026 WC form — ${f.home_team}: ${homeForm} | ${f.away_team}: ${awayForm}`,
+      `Sportsbet odds: ${oddsLine}`,
     ].join('\n');
   }).join('\n\n');
 
@@ -97,7 +139,7 @@ For each match provide:
 **Head-to-head** — recent meetings, patterns.
 **Form & key players** — squad quality, notable names. Use the tournament form above as a starting point.
 **Injury / suspension concerns** — any known absences.
-**Recommended bets** — top 2–3 specific suggestions (match result, over/under goals, BTTS, etc.) with brief reasoning and rough odds guidance. Use actual team names, not "home" or "away".
+**Recommended bets** — top 2–3 specific suggestions using the ACTUAL Sportsbet odds listed above. Reference the real prices (e.g. "Canada to win @ 2.10"). Prioritise bets where you see value relative to the true probability. Use actual team names, not "home" or "away".
 **Confidence** — High / Medium / Low and why.
 
 Keep it concise and practical. We're a group of mates sharing a betting kitty.`;
@@ -122,13 +164,26 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   const teams = [...new Set(result.results.flatMap(f => [f.home_team, f.away_team]))];
   const formMap = await fetchTeamForms(ctx.env.DB, teams);
 
+  // Load cached Sportsbet odds for each fixture
+  const oddsMap = new Map<number, OddsData>();
+  for (const f of result.results) {
+    const row = await ctx.env.DB.prepare('SELECT fixture_id, odds_json FROM odds_cache WHERE fixture_id = ?')
+      .bind(f.id).first<OddsRow>();
+    if (row) {
+      try {
+        const parsed = JSON.parse(row.odds_json) as OddsData;
+        if (parsed.available) oddsMap.set(f.id, parsed);
+      } catch { /* ignore corrupt cache */ }
+    }
+  }
+
   const tz = ctx.env.TIMEZONE || 'Australia/Perth';
-  const prompt = buildPrompt(result.results, tz, formMap);
+  const prompt = buildPrompt(result.results, tz, formMap, oddsMap);
 
   try {
     const stream = await ctx.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast' as Parameters<Ai['run']>[0], {
       messages: [
-        { role: 'system', content: 'You are a concise football betting analyst. Give practical, specific advice. Use markdown bold for section headers.' },
+        { role: 'system', content: 'You are a concise football betting analyst. Give practical, specific advice using the real Sportsbet odds provided. Always cite the actual odds price when recommending a bet. Use markdown bold for section headers.' },
         { role: 'user', content: prompt },
       ],
       stream: true,
