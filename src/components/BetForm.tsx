@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { Fixture, Participant, MarketType } from '../types'
 import { formatCents } from '../hooks/useApi'
 import AiTipModal from './AiTipModal'
@@ -46,7 +46,6 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
   const [oddsMeta, setOddsMeta] = useState<{ fetchCount: number; maxFetches: number; maxReached: boolean; fetchedAt: string; fromCache: boolean; stale?: boolean } | null>(null)
   const [oddsLoading, setOddsLoading] = useState(false)
   const [oddsError, setOddsError] = useState('')
-  const [oddsFixtureId, setOddsFixtureId] = useState<number | null>(null)
 
   const stakeNum = parseFloat(stake) || 0
   const oddsNum = parseFloat(odds) || 0
@@ -64,7 +63,18 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
     ? bettableFixtures.find(x => x.id === selectedFixtures[0])
     : undefined
 
-  // Derive title automatically — uses team names for home/away markets
+  // Auto-load odds whenever the selected single fixture changes
+  useEffect(() => {
+    if (singleFixture) {
+      loadOdds(singleFixture.id)
+    } else {
+      setOddsData(null)
+      setOddsMeta(null)
+      setOddsError('')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [singleFixture?.id])
+
   const autoTitle = singleFixture
     ? (() => {
         const mkt = MARKETS.find(m => m.value === marketType)
@@ -75,21 +85,19 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
       ? `Multi (${selectedFixtures.length} games)`
       : ''
 
-  // Fixtures to analyse in AI tip: selected ones, or all bettable if none chosen
   const aiFixtures = selectedFixtures.length > 0
     ? bettableFixtures.filter(f => selectedFixtures.includes(f.id))
     : bettableFixtures
 
+  const goalsSelected = marketType === 'over_goals' || marketType === 'under_goals'
+
   function toggleFixture(id: number) {
     setSelectedFixtures(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
-    // Clear odds when selection changes to a different fixture
-    if (id !== oddsFixtureId) { setOddsData(null); setOddsMeta(null); setOddsError('') }
   }
 
   async function loadOdds(fixtureId: number) {
     setOddsLoading(true)
     setOddsError('')
-    setOddsFixtureId(fixtureId)
     try {
       const r = await fetch(`/api/fixtures/${fixtureId}/odds`)
       const d = await r.json() as Record<string, number | boolean | string>
@@ -131,11 +139,10 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
     if (!stake || stakeNum <= 0) { setError('Enter a valid stake'); return }
     if (!odds || oddsNum < 1.01) { setError('Odds must be at least 1.01'); return }
 
-    const marketParams = (marketType === 'over_goals' || marketType === 'under_goals')
+    const effectiveMarket: MarketType = selectedFixtures.length === 1 ? marketType : 'custom'
+    const marketParams = (effectiveMarket === 'over_goals' || effectiveMarket === 'under_goals')
       ? JSON.stringify({ line: parseFloat(goalsLine) || 2.5 })
       : null
-
-    const betType = selectedFixtures.length === 1 ? 'single' : 'multi'
 
     setLoading(true)
     try {
@@ -147,8 +154,8 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
           participant_id: participantId || null,
           title: autoTitle,
           description: null,
-          bet_type: betType,
-          market_type: marketType,
+          bet_type: selectedFixtures.length === 1 ? 'single' : 'multi',
+          market_type: effectiveMarket,
           market_params_json: marketParams,
           stake_amount: Math.round(stakeNum * 100),
           odds_decimal: oddsNum,
@@ -239,53 +246,51 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
             </div>
           )}
 
-          {/* Market */}
-          {selectedFixtures.length > 0 && (
-            <>
-              <div className="form-group">
-                <label className="form-label">Market</label>
-                <select className="form-select" value={marketType} onChange={e => setMarketType(e.target.value as MarketType)}>
-                  {MARKETS.map(m => (
-                    <option key={m.value} value={m.value}>
-                      {marketLabel(m, singleFixture?.home_team, singleFixture?.away_team)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {(marketType === 'over_goals' || marketType === 'under_goals') && (
-                <div className="form-group">
-                  <label className="form-label">Goals line</label>
-                  <input type="number" className="form-input" value={goalsLine} onChange={e => setGoalsLine(e.target.value)} step="0.5" min="0.5" />
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Sportsbet live odds — single game only */}
+          {/* Market & odds — single game only; auto-loaded */}
           {singleFixture && (
             <div className="form-group">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <label className="form-label" style={{ margin: 0 }}>Sportsbet odds</label>
-                {!oddsData && !oddsError && (
-                  <button type="button" className="btn btn-ghost btn-sm"
-                    onClick={() => loadOdds(singleFixture.id)} disabled={oddsLoading}>
-                    {oddsLoading ? 'Loading…' : '🔄 Load'}
-                  </button>
-                )}
-                {(oddsData || oddsError) && (
-                  <button type="button" className="btn btn-ghost btn-sm"
+                <label className="form-label" style={{ margin: 0 }}>Market & Odds</label>
+                {!oddsLoading && (oddsData || oddsError) && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
                     onClick={() => loadOdds(singleFixture.id)}
-                    disabled={oddsLoading || oddsMeta?.maxReached === true}
+                    disabled={oddsMeta?.maxReached === true}
                     title={oddsMeta?.maxReached ? 'Max refreshes reached for this game' : 'Refresh odds'}
                   >
-                    {oddsLoading ? 'Loading…' : oddsMeta?.maxReached ? '🔒 Max reached' : '↺ Refresh'}
+                    {oddsMeta?.maxReached ? '🔒 Max reached' : '↺ Refresh'}
                   </button>
                 )}
               </div>
 
-              {oddsError && <p className="text-xs text-muted">{oddsError}</p>}
+              {oddsLoading && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0' }}>
+                  <div className="spinner" style={{ width: 16, height: 16 }} />
+                  <span className="text-muted" style={{ fontSize: '0.82rem' }}>Loading odds…</span>
+                </div>
+              )}
 
-              {oddsData && (
+              {oddsError && !oddsLoading && (
+                <>
+                  <p className="text-xs text-muted" style={{ marginBottom: '0.5rem' }}>{oddsError}</p>
+                  <select className="form-select" value={marketType} onChange={e => setMarketType(e.target.value as MarketType)}>
+                    {MARKETS.map(m => (
+                      <option key={m.value} value={m.value}>
+                        {marketLabel(m, singleFixture.home_team, singleFixture.away_team)}
+                      </option>
+                    ))}
+                  </select>
+                  {goalsSelected && (
+                    <div className="form-group" style={{ marginTop: '0.75rem' }}>
+                      <label className="form-label">Goals line</label>
+                      <input type="number" className="form-input" value={goalsLine} onChange={e => setGoalsLine(e.target.value)} step="0.5" min="0.5" />
+                    </div>
+                  )}
+                </>
+              )}
+
+              {oddsData && !oddsLoading && (
                 <>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
                     {oddsData.home_win != null && (
@@ -343,6 +348,12 @@ export default function BetForm({ matchDayId, fixtures, participants, budget, st
                       </button>
                     )}
                   </div>
+                  {goalsSelected && (
+                    <div className="form-group" style={{ marginTop: '0.75rem' }}>
+                      <label className="form-label">Goals line</label>
+                      <input type="number" className="form-input" value={goalsLine} onChange={e => setGoalsLine(e.target.value)} step="0.5" min="0.5" />
+                    </div>
+                  )}
                   {oddsMeta && (
                     <p className="text-xs text-muted" style={{ marginTop: '0.35rem' }}>
                       {oddsMeta.stale ? 'Stale · ' : oddsMeta.fromCache ? 'Cached · ' : 'Live · '}
