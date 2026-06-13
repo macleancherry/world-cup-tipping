@@ -70,9 +70,12 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
 
   // Next match day that still has budget remaining AND at least one bettable game
   const nextBettableMD = await db.prepare(`
-    SELECT md.id, md.local_date
+    SELECT md.id, md.local_date, md.budget_amount,
+           p.name as assigned_participant_name,
+           COALESCE(ds.staked, 0) as day_staked
     FROM match_days md
     JOIN fixtures f ON f.kickoff_local_date = md.local_date
+    LEFT JOIN participants p ON md.assigned_participant_id = p.id
     LEFT JOIN (
       SELECT match_day_id, COALESCE(SUM(stake_amount), 0) AS staked
       FROM bets WHERE settlement_status != 'void'
@@ -82,7 +85,7 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
       AND (md.budget_amount = 0 OR COALESCE(ds.staked, 0) < md.budget_amount)
     ORDER BY f.kickoff_utc ASC
     LIMIT 1
-  `).first<{ id: number; local_date: string }>();
+  `).first<{ id: number; local_date: string; budget_amount: number; assigned_participant_name: string | null; day_staked: number }>();
 
   return new Response(JSON.stringify({
     kitty: {
@@ -96,6 +99,7 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     },
     today_match_day: todayMD ? { ...todayMD, today_staked: todayStaked, today_budget: todayBudget } : null,
     next_bettable_match_day_id: nextBettableMD?.id ?? null,
+    next_bettable_match_day: nextBettableMD ?? null,
     upcoming_fixtures: upcomingFixtures.results,
     recent_fixtures: recentFixtures.results,
     live_fixtures: liveWithBets,

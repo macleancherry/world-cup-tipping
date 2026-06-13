@@ -25,6 +25,13 @@ interface DashboardData {
     today_budget: number
   } | null
   next_bettable_match_day_id: number | null
+  next_bettable_match_day: {
+    id: number
+    local_date: string
+    budget_amount: number
+    assigned_participant_name: string | null
+    day_staked: number
+  } | null
   upcoming_fixtures: Fixture[]
   recent_fixtures: Fixture[]
   live_fixtures: LiveFixture[]
@@ -71,7 +78,7 @@ export default function DashboardPage() {
   if (loading) return <div className="loading-screen"><div className="spinner" /></div>
   if (!data) return <div className="alert alert-error">Failed to load dashboard</div>
 
-  const { kitty, today_match_day: today, next_bettable_match_day_id, upcoming_fixtures, recent_fixtures, live_fixtures = [], pending_bets, needs_settlement } = data
+  const { kitty, today_match_day: today, next_bettable_match_day_id, next_bettable_match_day, upcoming_fixtures, recent_fixtures, live_fixtures = [], pending_bets, needs_settlement } = data
   const addBetPath = next_bettable_match_day_id
     ? `/match-days?day=${next_bettable_match_day_id}`
     : '/match-days'
@@ -246,33 +253,39 @@ export default function DashboardPage() {
               })
             })()
           )}
-          {today && (
-            <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-muted">Today's budget used</span>
-                <span>{formatCents(today.today_staked)} / {formatCents(today.today_budget)}</span>
+          {(() => {
+            const todayExhausted = today != null && today.today_staked >= today.today_budget
+            const budgetDay = (today != null && !todayExhausted)
+              ? { local_date: today.local_date, budget_amount: today.today_budget, day_staked: today.today_staked, assigned_participant_name: today.assigned_participant_name }
+              : next_bettable_match_day
+            if (!budgetDay) return null
+            const isToday = budgetDay.local_date === today?.local_date
+            const dayLabel = isToday ? "Today's budget" : `${formatDate(budgetDay.local_date)} budget`
+            const pct = budgetDay.budget_amount > 0 ? Math.min(100, (budgetDay.day_staked / budgetDay.budget_amount) * 100) : 0
+            return (
+              <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-muted">{dayLabel} used</span>
+                  <span>{formatCents(budgetDay.day_staked)} / {formatCents(budgetDay.budget_amount)}</span>
+                </div>
+                <div className="progress-bar">
+                  <div
+                    className={`progress-fill ${pct > 80 ? 'danger' : pct > 50 ? 'warning' : ''}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-muted mt-1">
+                  <span>{formatCents(Math.max(0, budgetDay.budget_amount - budgetDay.day_staked))} remaining</span>
+                  {budgetDay.assigned_participant_name && <span>Bettor: {budgetDay.assigned_participant_name}</span>}
+                </div>
+                {upcoming_fixtures.length > 0 && (
+                  <Link to={addBetPath} className="btn btn-primary btn-block" style={{ marginTop: '0.75rem' }}>
+                    + Add a Bet on Upcoming Games
+                  </Link>
+                )}
               </div>
-              <div className="progress-bar">
-                <div
-                  className={`progress-fill ${today.today_staked / today.today_budget > 0.8 ? 'danger' : today.today_staked / today.today_budget > 0.5 ? 'warning' : ''}`}
-                  style={{ width: `${Math.min(100, (today.today_staked / today.today_budget) * 100)}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-muted mt-1">
-                <span>{formatCents(Math.max(0, today.today_budget - today.today_staked))} remaining</span>
-                {today.assigned_participant_name && <span>Bettor: {today.assigned_participant_name}</span>}
-              </div>
-              {upcoming_fixtures.length > 0 && (
-                <Link
-                  to={addBetPath}
-                  className="btn btn-primary btn-block"
-                  style={{ marginTop: '0.75rem' }}
-                >
-                  + Add a Bet on Upcoming Games
-                </Link>
-              )}
-            </div>
-          )}
+            )
+          })()}
         </div>
 
         {/* Recent results */}
