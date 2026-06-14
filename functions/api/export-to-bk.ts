@@ -21,13 +21,20 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     db.prepare('SELECT * FROM kitty_transactions ORDER BY id').all(),
   ]);
 
-  // contributions is lazily created — only query if the table exists
-  const contribTableExists = await db.prepare(
-    "SELECT name FROM sqlite_master WHERE type='table' AND name='contributions'"
-  ).first();
-  const contributions = contribTableExists
-    ? (await db.prepare('SELECT * FROM contributions ORDER BY id').all()).results
-    : [];
+  // Lazily-created tables — only query if they exist
+  const [contribExists, oracleExists] = await Promise.all([
+    db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='contributions'").first(),
+    db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='oracle_picks'").first(),
+  ]);
+  const [contributions, oracle_picks, settings] = await Promise.all([
+    contribExists
+      ? db.prepare('SELECT * FROM contributions ORDER BY id').all().then(r => r.results)
+      : Promise.resolve([]),
+    oracleExists
+      ? db.prepare('SELECT * FROM oracle_picks ORDER BY id').all().then(r => r.results)
+      : Promise.resolve([]),
+    db.prepare('SELECT * FROM settings').all().then(r => r.results),
+  ]);
 
   const payload = {
     participants:       pRow.results,
@@ -37,6 +44,8 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     bet_fixture_links:  blRow.results,
     kitty_transactions: txRow.results,
     contributions,
+    oracle_picks,
+    settings,
   };
 
   // Authenticate with BK admin
