@@ -4,6 +4,7 @@ import fixtures from '../data/world-cup-2026-fixtures.json'
 export default function ImportExportPage() {
   const [importing, setImporting] = useState(false)
   const [seedingFixtures, setSeedingFixtures] = useState(false)
+  const [migrating, setMigrating] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -58,6 +59,21 @@ export default function ImportExportPage() {
       showMsg('error', (e as Error).message)
     } finally {
       setSeedingFixtures(false)
+    }
+  }
+
+  async function migrateTooBettingKitty() {
+    setMigrating(true)
+    try {
+      const r = await fetch('/api/export-to-bk', { method: 'POST' })
+      const result = await r.json() as { ok?: boolean; counts?: Record<string, number>; error?: string; exported?: Record<string, number> }
+      if (!r.ok) throw new Error(result.error ?? `Migration failed (${r.status})`)
+      const c = result.counts ?? {}
+      showMsg('success', `Migrated to betting-kitty ✓ — ${c.participants} participants, ${c.match_days} match days, ${c.bets} bets, ${c.kitty_transactions} transactions`)
+    } catch (e) {
+      showMsg('error', (e as Error).message)
+    } finally {
+      setMigrating(false)
     }
   }
 
@@ -120,6 +136,21 @@ export default function ImportExportPage() {
             <a href="/settings" className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }}>Settings →</a>
           </div>
         </div>
+      </div>
+
+      {/* Migrate to betting-kitty */}
+      <div className="card mb-4">
+        <div className="card-header">
+          <span className="card-title">Migrate to Betting Kitty</span>
+        </div>
+        <p className="text-sm text-secondary mb-3">
+          One-tap migration: exports all data from this app and imports it into the
+          multi-tenant <strong>Audere est Suffer</strong> group on betting-kitty.
+          Safe to run multiple times — each run overwrites the previous import.
+        </p>
+        <button className="btn btn-primary" onClick={migrateTooBettingKitty} disabled={migrating}>
+          {migrating ? 'Migrating…' : 'Migrate to Betting Kitty →'}
+        </button>
       </div>
 
       {/* Export */}
