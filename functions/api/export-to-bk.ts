@@ -21,13 +21,22 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     db.prepare('SELECT * FROM kitty_transactions ORDER BY id').all(),
   ]);
 
+  // contributions is lazily created — only query if the table exists
+  const contribTableExists = await db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='contributions'"
+  ).first();
+  const contributions = contribTableExists
+    ? (await db.prepare('SELECT * FROM contributions ORDER BY id').all()).results
+    : [];
+
   const payload = {
-    participants:      pRow.results,
-    fixtures:          fRow.results,
-    match_days:        mdRow.results,
-    bets:              bRow.results,
-    bet_fixture_links: blRow.results,
+    participants:       pRow.results,
+    fixtures:           fRow.results,
+    match_days:         mdRow.results,
+    bets:               bRow.results,
+    bet_fixture_links:  blRow.results,
     kitty_transactions: txRow.results,
+    contributions,
   };
 
   // Authenticate with BK admin
